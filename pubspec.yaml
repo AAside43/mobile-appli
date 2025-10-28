@@ -1,0 +1,26 @@
+name: recipe_app
+description: A new Flutter project.
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+  
+    - assets/images/Room1.jpg
+    - assets/images/Room2.jpg
+    - assets/images/Room3.jpg
+    - assets/images/room_booking.png
