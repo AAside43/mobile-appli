@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:recipe_app/%E0%B9%89home_page.dart';
+// ignore: unused_import
 import 'home_page.dart';
 import 'checkrequest_page.dart';
 import 'history_page.dart';
@@ -13,6 +14,7 @@ class RoomPage extends StatefulWidget {
 }
 
 class _RoomPageState extends State<RoomPage> {
+  // ignore: unused_field
   int _selectedIndex = 1;
 
   // 🧠 ตัวแปรเก็บประวัติการจอง
