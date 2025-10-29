@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'login_page.dart';
+import 'room_page.dart';
+import 'history_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
