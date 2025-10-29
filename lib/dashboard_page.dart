@@ -66,6 +66,69 @@ class DashboardPage extends StatelessWidget {
           ),
         ],
       ),
+
+
+      // BOTTOM NAV BAR
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 12,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          currentIndex: 0, // หน้า Home คือ index 0
+          selectedItemColor: Colors.orange[700],
+          unselectedItemColor: Colors.black54,
+          showUnselectedLabels: true,
+          backgroundColor: Colors.white,
+
+          // ✅ ฟังก์ชันเมื่อกดแท็บ
+          onTap: (index) {
+            if (index == 0) {
+              // อยู่หน้า Home แล้ว ไม่ต้องทำอะไร
+            } else if (index == 1) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const RoomPage()),
+              );
+            }  else if (index == 2) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HistoryPage()),
+              );
+            }
+          },
+
+          // ✅ รายการไอคอน (พร้อมวงกลมสีส้มเฉพาะ Home)
+          items: [
+            BottomNavigationBarItem(
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFFA726),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.dashboard, color: Colors.white),
+              ),
+              label: "Dashboard",
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.meeting_room_outlined),
+              label: "Room",
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.history),
+              label: "History",
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
