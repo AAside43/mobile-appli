@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_appli_1/add_room.dart';
 import 'package:mobile_appli_1/dashboard_page.dart';
+import 'package:mobile_appli_1/edit_room.dart';
 import 'package:mobile_appli_1/history_page.dart';
 import 'package:mobile_appli_1/login_page.dart';
 
@@ -19,35 +20,51 @@ class _RoomPageState extends State<RoomPage> {
         widget.room != null && widget.room!.isNotEmpty
             ? widget.room!
                 .map((item) => {
-                  "image": item["image"] ?? "",
-                  "room": item["room"],
-                  "capacity": "-",
-                })
+                      "image": item["image"] ?? "",
+                      "room": item["room"],
+                      "capacity": "-",
+                      "switch": item["status"] == "available" ? true : false,
+                    })
                 .toList()
             : [
                 // ✅ ข้อมูลตัวอย่างเดิมของคุณ (fallback)
                 {
-                  "image": "",
+                  "image": "assets/images/Room1.jpg",
                   "room": "ROOM 1",
                   "capacity": "4 People",
+                  "switch": true,
                 },
                 {
-                  "image": "",
+                  "image": "assets/images/Room2.jpg",
                   "room": "ROOM 2",
                   "capacity": "8 People",
+                  "switch": true,
                 },
                 {
-                  "image": "",
+                  "image": "assets/images/Room3.jpg",
                   "room": "ROOM 3",
                   "capacity": "16 People",
+                  "switch": true,
                 },
                 {
-                  "image": "",
+                  "image": "assets/images/Room1.jpg",
                   "room": "ROOM 4",
                   "capacity": "16 People",
+                  "switch": true,
+                },
+                {
+                  "image": "assets/images/Room2.jpg",
+                  "room": "ROOM 5",
+                  "capacity": "8 People",
+                  "switch": true,
+                },
+                {
+                  "image": "assets/images/Room3.jpg",
+                  "room": "ROOM 6",
+                  "capacity": "16 People",
+                  "switch": true,
                 },
               ];
-
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -124,6 +141,108 @@ class _RoomPageState extends State<RoomPage> {
         ],
       ),
 
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: roomList.isEmpty
+            ? const Center(
+                child: Text(
+                  "No room yet",
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              )
+            : ListView.builder(
+                itemCount: roomList.length,
+                itemBuilder: (context, index) {
+                  final item = roomList[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              item["image"] != null && item["image"]!.isNotEmpty
+                                  ? Image.network(
+                                      item["image"],
+                                      height: 120,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Container(
+                                      height: 120,
+                                      width: double.infinity,
+                                      color: Colors.grey.shade200,
+                                      child: const Icon(
+                                        Icons.photo,
+                                        color: Colors.grey,
+                                        size: 50,
+                                      ),
+                                    ),
+                              Text(
+                                item["room"],
+                                style: const TextStyle(
+                                  color: Color(0xFF3E7BFA),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(item["capacity"]),
+                              const SizedBox(height: 4),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Switch(
+                                value: item["switch"] ?? false,
+                                onChanged: (bool value) {
+                                  setState(() {
+                                    item["switch"] = value;
+                                  });
+                                },
+                                activeColor: Colors.green,
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.edit_rounded,
+                                  color: Colors.black,
+                                  size: 26,
+                                ),
+                                onPressed: () {
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (context) => const EditRoom()),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+      ),
 
       // BOTTOM NAV BAR
       bottomNavigationBar: Container(
@@ -154,7 +273,7 @@ class _RoomPageState extends State<RoomPage> {
               );
             } else if (index == 1) {
               // อยู่หน้า Room แล้ว ไม่ต้องทำอะไร
-            }  else if (index == 2) {
+            } else if (index == 2) {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const HistoryPage()),
@@ -175,7 +294,8 @@ class _RoomPageState extends State<RoomPage> {
                   color: Color(0xFFFFA726),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.meeting_room_outlined, color: Colors.white),
+                child: const Icon(Icons.meeting_room_outlined,
+                    color: Colors.white),
               ),
               label: "Room",
             ),
