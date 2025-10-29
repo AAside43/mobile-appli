@@ -79,7 +79,7 @@ class HistoryPage extends StatelessWidget {
         elevation: 3,
         shadowColor: Colors.black.withOpacity(0.15),
         title: const Text(
-          "Dashboard",
+          "History",
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -222,7 +222,7 @@ class HistoryPage extends StatelessWidget {
         ),
         child: BottomNavigationBar(
           type: BottomNavigationBarType.fixed,
-          currentIndex: 0, // หน้า Home คือ index 0
+          currentIndex: 2, // หน้า Home คือ index 0
           selectedItemColor: Colors.orange[700],
           unselectedItemColor: Colors.black54,
           showUnselectedLabels: true,

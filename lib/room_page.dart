@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_appli_1/add_room.dart';
 import 'package:mobile_appli_1/dashboard_page.dart';
 import 'package:mobile_appli_1/history_page.dart';
 import 'package:mobile_appli_1/login_page.dart';
@@ -20,7 +21,7 @@ class _RoomPageState extends State<RoomPage> {
         elevation: 3,
         shadowColor: Colors.black.withOpacity(0.15),
         title: const Text(
-          "Dashboard",
+          "Room",
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -29,6 +30,20 @@ class _RoomPageState extends State<RoomPage> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.add_box_rounded,
+              color: Colors.black,
+              size: 26,
+            ),
+            onPressed: () {
+              // Action when pressed
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const AddRoom()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(
               Icons.logout_rounded,
@@ -89,7 +104,7 @@ class _RoomPageState extends State<RoomPage> {
         ),
         child: BottomNavigationBar(
           type: BottomNavigationBarType.fixed,
-          currentIndex: 0, // หน้า Home คือ index 0
+          currentIndex: 1, // หน้า Home คือ index 0
           selectedItemColor: Colors.orange[700],
           unselectedItemColor: Colors.black54,
           showUnselectedLabels: true,
