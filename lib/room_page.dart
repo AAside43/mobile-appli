@@ -181,13 +181,21 @@ class _RoomPageState extends State<RoomPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              item["image"] != null && item["image"]!.isNotEmpty
-                                  ? Image.network(
-                                      item["image"],
-                                      height: 120,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                    )
+                              item["image"] != null && (item["image"] as String).isNotEmpty
+                                  ? (
+                                      (item["image"] as String).startsWith('http')
+                                          ? Image.network(
+                                              item["image"],
+                                              height: 120,
+                                              width: double.infinity,
+                                              fit: BoxFit.cover,
+                                            )
+                                          : Image.asset(
+                                              item["image"],
+                                              height: 120,
+                                              width: double.infinity,
+                                              fit: BoxFit.cover,
+                                            ))
                                   : Container(
                                       height: 120,
                                       width: double.infinity,
