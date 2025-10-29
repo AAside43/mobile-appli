@@ -14,58 +14,64 @@ class RoomPage extends StatefulWidget {
 }
 
 class _RoomPageState extends State<RoomPage> {
+  // hold room list in state so switches persist while the page is active
+  late List<Map<String, dynamic>> roomList;
+
+  @override
+  void initState() {
+    super.initState();
+    roomList = widget.room != null && widget.room!.isNotEmpty
+        ? widget.room!
+            .map((item) => {
+                  "image": item["image"] ?? "",
+                  "room": item["room"],
+                  "capacity": "-",
+                  "switch": item["status"] == "available" ? true : false,
+                })
+            .toList()
+        : [
+            // ✅ ข้อมูลตัวอย่างเดิมของคุณ (fallback)
+            {
+              "image": "assets/images/Room1.jpg",
+              "room": "ROOM 1",
+              "capacity": "4 People",
+              "switch": true,
+            },
+            {
+              "image": "assets/images/Room2.jpg",
+              "room": "ROOM 2",
+              "capacity": "8 People",
+              "switch": true,
+            },
+            {
+              "image": "assets/images/Room3.jpg",
+              "room": "ROOM 3",
+              "capacity": "16 People",
+              "switch": true,
+            },
+            {
+              "image": "assets/images/Room1.jpg",
+              "room": "ROOM 4",
+              "capacity": "16 People",
+              "switch": true,
+            },
+            {
+              "image": "assets/images/Room2.jpg",
+              "room": "ROOM 5",
+              "capacity": "8 People",
+              "switch": true,
+            },
+            {
+              "image": "assets/images/Room3.jpg",
+              "room": "ROOM 6",
+              "capacity": "16 People",
+              "switch": true,
+            },
+          ];
+  }
+
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> roomList =
-        widget.room != null && widget.room!.isNotEmpty
-            ? widget.room!
-                .map((item) => {
-                      "image": item["image"] ?? "",
-                      "room": item["room"],
-                      "capacity": "-",
-                      "switch": item["status"] == "available" ? true : false,
-                    })
-                .toList()
-            : [
-                // ✅ ข้อมูลตัวอย่างเดิมของคุณ (fallback)
-                {
-                  "image": "assets/images/Room1.jpg",
-                  "room": "ROOM 1",
-                  "capacity": "4 People",
-                  "switch": true,
-                },
-                {
-                  "image": "assets/images/Room2.jpg",
-                  "room": "ROOM 2",
-                  "capacity": "8 People",
-                  "switch": true,
-                },
-                {
-                  "image": "assets/images/Room3.jpg",
-                  "room": "ROOM 3",
-                  "capacity": "16 People",
-                  "switch": true,
-                },
-                {
-                  "image": "assets/images/Room1.jpg",
-                  "room": "ROOM 4",
-                  "capacity": "16 People",
-                  "switch": true,
-                },
-                {
-                  "image": "assets/images/Room2.jpg",
-                  "room": "ROOM 5",
-                  "capacity": "8 People",
-                  "switch": true,
-                },
-                {
-                  "image": "assets/images/Room3.jpg",
-                  "room": "ROOM 6",
-                  "capacity": "16 People",
-                  "switch": true,
-                },
-              ];
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -215,7 +221,7 @@ class _RoomPageState extends State<RoomPage> {
                                 value: item["switch"] ?? false,
                                 onChanged: (bool value) {
                                   setState(() {
-                                    item["switch"] = value;
+                                    roomList[index]["switch"] = value;
                                   });
                                 },
                                 activeColor: Colors.green,

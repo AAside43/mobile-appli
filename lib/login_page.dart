@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_appli_1/room_page.dart';
 import 'register_page.dart';
-import 'room_manager_app.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
