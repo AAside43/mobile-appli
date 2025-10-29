@@ -5,7 +5,8 @@ import 'package:mobile_appli_1/history_page.dart';
 import 'package:mobile_appli_1/login_page.dart';
 
 class RoomPage extends StatefulWidget {
-  const RoomPage({super.key});
+  final List<Map<String, String>>? room;
+  const RoomPage({super.key, this.room});
 
   @override
   State<RoomPage> createState() => _RoomPageState();
@@ -14,6 +15,40 @@ class RoomPage extends StatefulWidget {
 class _RoomPageState extends State<RoomPage> {
   @override
   Widget build(BuildContext context) {
+    final List<Map<String, dynamic>> roomList =
+        widget.room != null && widget.room!.isNotEmpty
+            ? widget.room!
+                .map((item) => {
+                  "image": item["image"] ?? "",
+                  "room": item["room"],
+                  "capacity": "-",
+                })
+                .toList()
+            : [
+                // ✅ ข้อมูลตัวอย่างเดิมของคุณ (fallback)
+                {
+                  "image": "",
+                  "room": "ROOM 1",
+                  "capacity": "4 People",
+                },
+                {
+                  "image": "",
+                  "room": "ROOM 2",
+                  "capacity": "8 People",
+                },
+                {
+                  "image": "",
+                  "room": "ROOM 3",
+                  "capacity": "16 People",
+                },
+                {
+                  "image": "",
+                  "room": "ROOM 4",
+                  "capacity": "16 People",
+                },
+              ];
+
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
