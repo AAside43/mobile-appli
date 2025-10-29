@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'register_page.dart';
-// ignore: unused_import
-import 'home_page.dart';
-import '้home_page.dart';
+import 'room_manager_app.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -26,12 +24,11 @@ class _LoginPageState extends State<LoginPage> {
   // ✅ ฟังก์ชัน Login (แก้ตรงนี้)
   void _login() {
     // ถ้ามีการกรอกครบทั้ง 2 ช่อง
-    if (_studentIdController.text.isNotEmpty &&
-        _passwordController.text.isNotEmpty) {
-      // ไปหน้า HomePage
+    if (_studentIdController.text.isNotEmpty && _passwordController.text.isNotEmpty) {
+      // ไปหน้า HomeShell (main app shell)
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
+        MaterialPageRoute(builder: (context) => const HomeShell()),
       );
     } else {
       // ถ้ายังไม่กรอกช่องใดช่องหนึ่ง ให้แจ้งเตือน
