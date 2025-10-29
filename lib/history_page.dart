@@ -4,10 +4,74 @@ import 'login_page.dart';
 import 'room_page.dart';
 
 class HistoryPage extends StatelessWidget {
-  const HistoryPage({super.key});
+  // ✅ เพิ่มพารามิเตอร์รับข้อมูลจาก RoomPage
+  final List<Map<String, String>>? history;
+  const HistoryPage({Key? key, this.history}) : super(key: key);
+
+  Color _getStatusColor(String status) {
+    if (status == "Approved") return Colors.green;
+    if (status == "Rejected") return Colors.red;
+    if (status == "Pending") return Colors.orange;
+    return Colors.grey;
+  }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ ถ้ามี history จาก RoomPage ให้ใช้ข้อมูลจริง
+    final List<Map<String, dynamic>> historyList =
+        history != null && history!.isNotEmpty
+            ? history!
+                .map((item) => {
+                      "room": item["room"],
+                      "capacity": "-",
+                      "date": "Oct 5, 2025",
+                      "time": item["time"],
+                      "reserved": "Student A",
+                      "approved": "Lecturer CE",
+                      "reason": item["reason"],
+                      "status": item["status"] ?? "Pending",
+                    })
+                .toList()
+            : [
+                // ✅ ข้อมูลตัวอย่างเดิมของคุณ (fallback)
+                {
+                  "room": "ROOM 1",
+                  "capacity": "4 People",
+                  "date": "Oct 5, 2025",
+                  "time": "08:00 - 10:00",
+                  "reserved": "Student A",
+                  "approved": "Lecturer A",
+                  "status": "Approved"
+                },
+                {
+                  "room": "ROOM 2",
+                  "capacity": "8 People",
+                  "date": "Oct 5, 2025",
+                  "time": "10:00 - 12:00",
+                  "reserved": "Student A",
+                  "approved": "Lecturer B",
+                  "status": "Approved"
+                },
+                {
+                  "room": "ROOM 3",
+                  "capacity": "16 People",
+                  "date": "Oct 5, 2025",
+                  "time": "13:00 - 15:00",
+                  "reserved": "Student A",
+                  "approved": "Lecturer C",
+                  "status": "Rejected"
+                },
+                {
+                  "room": "ROOM 4",
+                  "capacity": "16 People",
+                  "date": "Oct 5, 2025",
+                  "time": "15:00 - 17:00",
+                  "reserved": "Student A",
+                  "approved": "Lecturer D",
+                  "status": "Rejected"
+                },
+              ];
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -67,6 +131,81 @@ class HistoryPage extends StatelessWidget {
             },
           ),
         ],
+      ),
+
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: historyList.isEmpty
+            ? const Center(
+                child: Text(
+                  "No booking history yet",
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              )
+            : ListView.builder(
+                itemCount: historyList.length,
+                itemBuilder: (context, index) {
+                  final item = historyList[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item["room"],
+                                style: const TextStyle(
+                                  color: Color(0xFF3E7BFA),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(item["capacity"]),
+                              const SizedBox(height: 4),
+                              Text("Date : ${item["date"]}"),
+                              Text("Time : ${item["time"]}"),
+                              if (item["reason"] != null)
+                                Text("Reason : ${item["reason"]}"),
+                              Text("Reserved by : ${item["reserved"]}"),
+                              Text("Approved by : ${item["approved"]}"),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(item["status"]),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            item["status"],
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
       ),
 
       // BOTTOM NAV BAR
