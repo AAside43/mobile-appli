@@ -70,6 +70,7 @@ class DashboardPage extends StatelessWidget {
       ),
 
 
+
       // BOTTOM NAV BAR
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

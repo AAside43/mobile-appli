@@ -197,7 +197,7 @@ class _RoomPageState extends State<RoomPage> {
                                               fit: BoxFit.cover,
                                             ))
                                   : Container(
-                                      height: 120,
+                                      height: 100,
                                       width: double.infinity,
                                       color: Colors.grey.shade200,
                                       child: const Icon(
