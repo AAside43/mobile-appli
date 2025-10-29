@@ -186,13 +186,13 @@ class _RoomPageState extends State<RoomPage> {
                                       (item["image"] as String).startsWith('http')
                                           ? Image.network(
                                               item["image"],
-                                              height: 120,
+                                              height: 100,
                                               width: double.infinity,
                                               fit: BoxFit.cover,
                                             )
                                           : Image.asset(
                                               item["image"],
-                                              height: 120,
+                                              height: 100,
                                               width: double.infinity,
                                               fit: BoxFit.cover,
                                             ))
