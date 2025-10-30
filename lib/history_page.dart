@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
-// ignore: unused_import
-import 'home_page.dart';
+import 'package:mobile_appli_1/dashboard_page.dart';
 import 'room_page.dart';
-import 'checkrequest_page.dart';
-import '้home_page.dart';
+import 'approved_page.dart';
 import 'login_page.dart';
 
 class HistoryPage extends StatelessWidget {
   // ✅ เพิ่มพารามิเตอร์รับข้อมูลจาก RoomPage
   final List<Map<String, String>>? history;
-  const HistoryPage({Key? key, this.history}) : super(key: key);
+  const HistoryPage({super.key, this.history});
 
   Color _getStatusColor(String status) {
     if (status == "Approved") return Colors.green;
@@ -25,13 +23,13 @@ class HistoryPage extends StatelessWidget {
     void onTabTapped(int index) {
       if (index == 0) {
         Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const HomePage()));
+            context, MaterialPageRoute(builder: (_) => DashboardPage()));
       } else if (index == 1) {
         Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const RoomPage()));
+            context, MaterialPageRoute(builder: (_) => RoomPage()));
       } else if (index == 2) {
         Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => const CheckRequestPage()));
+            MaterialPageRoute(builder: (_) => ApprovedPage()));
       }
     }
 
@@ -65,8 +63,8 @@ class HistoryPage extends StatelessWidget {
               "capacity": "8 People",
               "date": "Oct 5, 2025",
               "time": "10:00 - 12:00",
-              "reserved": "Student A",
-              "approved": "Lecturer B",
+              "reserved": "Student B",
+              "approved": "Lecturer A",
               "status": "Approved"
             },
             {
@@ -74,8 +72,8 @@ class HistoryPage extends StatelessWidget {
               "capacity": "16 People",
               "date": "Oct 5, 2025",
               "time": "13:00 - 15:00",
-              "reserved": "Student A",
-              "approved": "Lecturer C",
+              "reserved": "Student C",
+              "approved": "Lecturer A",
               "status": "Rejected"
             },
             {
@@ -83,8 +81,8 @@ class HistoryPage extends StatelessWidget {
               "capacity": "16 People",
               "date": "Oct 5, 2025",
               "time": "15:00 - 17:00",
-              "reserved": "Student A",
-              "approved": "Lecturer D",
+              "reserved": "Student D",
+              "approved": "Lecturer A",
               "status": "Rejected"
             },
           ];
