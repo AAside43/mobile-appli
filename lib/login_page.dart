@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'register_page.dart';
-// ignore: unused_import
-import 'home_page.dart';
-import '้home_page.dart';
+import 'dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -31,7 +29,7 @@ class _LoginPageState extends State<LoginPage> {
       // ไปหน้า HomePage
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
+        MaterialPageRoute(builder: (context) => const DashboardPage()),
       );
     } else {
       // ถ้ายังไม่กรอกช่องใดช่องหนึ่ง ให้แจ้งเตือน
