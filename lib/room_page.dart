@@ -181,7 +181,16 @@ class _RoomPageState extends State<RoomPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              item["image"] != null && (item["image"] as String).isNotEmpty
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.asset(
+                                  item["image"],
+                                  height: 100,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              /*item["image"] != null && (item["image"] as String).isNotEmpty
                                   ? (
                                       (item["image"] as String).startsWith('http')
                                           ? Image.network(
@@ -205,7 +214,7 @@ class _RoomPageState extends State<RoomPage> {
                                         color: Colors.grey,
                                         size: 50,
                                       ),
-                                    ),
+                                    ),*/
                               Text(
                                 item["room"],
                                 style: const TextStyle(
