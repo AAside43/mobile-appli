@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_appli_1/room_page.dart';
-import 'login_page.dart';  // Adjust the import path based on your file structure
+import 'login_page.dart'; // Adjust the import path based on your file structure
 
 class AddRoom extends StatefulWidget {
   const AddRoom({super.key});
@@ -75,7 +75,6 @@ class _AddRoomState extends State<AddRoom> {
           ),
         ],
       ),
-
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -128,37 +127,37 @@ class _AddRoomState extends State<AddRoom> {
                 ElevatedButton(
                   onPressed: () {
                     showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text(
-                    "Save Room",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  content: const Text("Are you sure?"),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("Cancel"),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context); // ปิด popup
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const RoomPage(),
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text(
+                          "Save Room",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        content: const Text("Are you sure?"),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Cancel"),
                           ),
-                          (route) => false, // ล้าง stack ทั้งหมด
-                        );
-                      },
-                      child: const Text(
-                        "Save",
-                        style: TextStyle(color: Colors.green),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context); // ปิด popup
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const RoomPage(),
+                                ),
+                                (route) => false, // ล้าง stack ทั้งหมด
+                              );
+                            },
+                            child: const Text(
+                              "Save",
+                              style: TextStyle(color: Colors.green),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-              );
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
@@ -167,7 +166,15 @@ class _AddRoomState extends State<AddRoom> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(context);
+                    // Navigate back to RoomPage and clear the navigation stack so
+                    // the Room page becomes the root (consistent with Save flow).
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const RoomPage(),
+                      ),
+                      (route) => false,
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
@@ -179,7 +186,6 @@ class _AddRoomState extends State<AddRoom> {
           ],
         ),
       ),
-
     );
   }
 }
