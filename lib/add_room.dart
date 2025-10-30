@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_appli_1/room_page.dart';
 import 'login_page.dart';  // Adjust the import path based on your file structure
 
 class AddRoom extends StatefulWidget {
@@ -126,8 +127,38 @@ class _AddRoomState extends State<AddRoom> {
               children: [
                 ElevatedButton(
                   onPressed: () {
-                    // TODO: Save logic
-                    print('Room Saved');
+                    showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text(
+                    "Save Room",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  content: const Text("Are you sure?"),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Cancel"),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context); // ปิด popup
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RoomPage(),
+                          ),
+                          (route) => false, // ล้าง stack ทั้งหมด
+                        );
+                      },
+                      child: const Text(
+                        "Save",
+                        style: TextStyle(color: Colors.green),
+                      ),
+                    ),
+                  ],
+                ),
+              );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
