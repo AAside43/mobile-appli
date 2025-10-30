@@ -1,4 +1,4 @@
-// Required Flutter material components for UI elements
+/*// Required Flutter material components for UI elements
 import 'package:flutter/material.dart';
 // Authentication service for handling login/logout operations
 import 'package:test_the_app/services/auth_service.dart';
@@ -332,4 +332,5 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
-}
+}*/
+
