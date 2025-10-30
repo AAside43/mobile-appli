@@ -190,31 +190,6 @@ class _RoomPageState extends State<RoomPage> {
                                   fit: BoxFit.cover,
                                 ),
                               ),
-                              /*item["image"] != null && (item["image"] as String).isNotEmpty
-                                  ? (
-                                      (item["image"] as String).startsWith('http')
-                                          ? Image.network(
-                                              item["image"],
-                                              height: 100,
-                                              width: double.infinity,
-                                              fit: BoxFit.cover,
-                                            )
-                                          : Image.asset(
-                                              item["image"],
-                                              height: 100,
-                                              width: double.infinity,
-                                              fit: BoxFit.cover,
-                                            ))
-                                  : Container(
-                                      height: 100,
-                                      width: double.infinity,
-                                      color: Colors.grey.shade200,
-                                      child: const Icon(
-                                        Icons.photo,
-                                        color: Colors.grey,
-                                        size: 50,
-                                      ),
-                                    ),*/
                               Text(
                                 item["room"],
                                 style: const TextStyle(

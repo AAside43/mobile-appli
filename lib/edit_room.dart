@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'login_page.dart';  // Import the login page
+import 'package:mobile_appli_1/room_page.dart';
+import 'login_page.dart'; // Import the login page
 
 class EditRoom extends StatefulWidget {
   const EditRoom({super.key});
@@ -9,6 +10,9 @@ class EditRoom extends StatefulWidget {
 }
 
 class _EditRoomState extends State<EditRoom> {
+  final TextEditingController _roomNameController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,9 +75,145 @@ class _EditRoomState extends State<EditRoom> {
           ),
         ],
       ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Image upload placeholder
+            GestureDetector(
+              onTap: () {
+                // TODO: Add image picker logic
+              },
+              child: Container(
+                height: 180,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey),
+                ),
+                child: Stack(
+                  fit: StackFit.expand, // Make the stack fill the container
+                  children: [
+                    // 1. The image
+                    ClipRRect(
+                      borderRadius:
+                          BorderRadius.circular(12), // Match Container's radius
+                      child: Image.asset(
+                        "assets/images/Room1.jpg",
+                        fit: BoxFit.cover, // Fill the space nicely
+                      ),
+                    ),
+                    // 2. A semi-transparent overlay to see the icon better
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.black.withOpacity(0.15), // Dark overlay
+                      ),
+                    ),
+                    // 3. The center icon
+                    Center(
+                      child: Icon(
+                        Icons
+                            .edit, // Use an edit icon, since an image is already shown
+                        size: 40,
+                        color: Colors
+                            .white, // White icon for visibility on dark overlay
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 20),
 
+            // Room name input
+            TextField(
+              controller: _roomNameController,
+              decoration: InputDecoration(
+                labelText: 'Add Room Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            SizedBox(height: 16),
 
+            // Description input
+            TextField(
+              controller: _descriptionController,
+              decoration: InputDecoration(
+                labelText: 'Add description here',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            SizedBox(height: 24),
 
+            // Save and Cancel buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text(
+                          "Save Room",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        content: const Text("Are you sure?"),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Cancel"),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context); // ปิด popup
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const RoomPage(),
+                                ),
+                                (route) => false, // ล้าง stack ทั้งหมด
+                              );
+                            },
+                            child: const Text(
+                              "Save",
+                              style: TextStyle(color: Colors.green),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
+                  child: Text('Save'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    // Navigate back to RoomPage and clear the navigation stack so
+                    // the Room page becomes the root (consistent with Save flow).
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const RoomPage(),
+                      ),
+                      (route) => false,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                  ),
+                  child: Text('Cancel'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
