@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_appli_1/home_page.dart';
-
-// ignore: unused_import
-import 'home_page.dart';
-import 'checkrequest_page.dart';
+import 'dashboard_page.dart';
+import 'approved_page.dart';
 import 'history_page.dart';
 import 'login_page.dart';
-import '้home_page.dart';
+
 
 class RoomPage extends StatefulWidget {
-  const RoomPage({Key? key}) : super(key: key);
+  const RoomPage({super.key});
 
   @override
   State<RoomPage> createState() => _RoomPageState();
@@ -17,10 +14,10 @@ class RoomPage extends StatefulWidget {
 
 class _RoomPageState extends State<RoomPage> {
   // ignore: unused_field
-  int _selectedIndex = 1;
+  final int _selectedIndex = 1;
 
   // 🧠 ตัวแปรเก็บประวัติการจอง
-  static List<Map<String, String>> _bookingHistory = [];
+  static final List<Map<String, String>> _bookingHistory = [];
 
   final List<String> timeSlots = [
     '08:00-10:00',
@@ -353,13 +350,13 @@ class _RoomPageState extends State<RoomPage> {
           showUnselectedLabels: true,
           onTap: (index) {
             if (index == 0) {
-              Navigator.pushReplacement(context,MaterialPageRoute(builder: (context) => const HomePage()));
+              Navigator.pushReplacement(context,MaterialPageRoute(builder: (context) => DashboardPage()));
 
             } else if (index == 2) {
               Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const CheckRequestPage()));
+                      builder: (context) => const ApprovedPage()));
             } else if (index == 3) {
               Navigator.pushReplacement(
                 context,
@@ -372,7 +369,7 @@ class _RoomPageState extends State<RoomPage> {
           items: [
             const BottomNavigationBarItem(
               icon: Icon(Icons.home_filled),
-              label: "Home",
+              label: "Dashboard",
             ),
             BottomNavigationBarItem(
               icon: Container(
