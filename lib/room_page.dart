@@ -267,7 +267,7 @@ class _RoomPageState extends State<RoomPage> {
             if (index == 0) {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const DashboardPage()),
+                MaterialPageRoute(builder: (context) => DashboardPage()),
               );
             } else if (index == 1) {
               // อยู่หน้า Room แล้ว ไม่ต้องทำอะไร

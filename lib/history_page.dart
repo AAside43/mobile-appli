@@ -233,7 +233,7 @@ class HistoryPage extends StatelessWidget {
             if (index == 0) {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const DashboardPage()),
+                MaterialPageRoute(builder: (context) => DashboardPage()),
               );
             } else if (index == 1) {
               Navigator.pushReplacement(

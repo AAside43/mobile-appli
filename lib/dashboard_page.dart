@@ -4,7 +4,14 @@ import 'room_page.dart';
 import 'history_page.dart';
 
 class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key});
+  DashboardPage({super.key});
+
+  final List<Map<String, dynamic>> roomStatus = [
+    {"label": "Pending room", "count": 2, "color": Colors.yellow},
+    {"label": "Free room", "count": 4, "color": Colors.green},
+    {"label": "Disable room", "count": 1, "color": Colors.grey},
+    {"label": "Reserved room", "count": 2, "color": Colors.red},
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +76,44 @@ class DashboardPage extends StatelessWidget {
         ],
       ),
 
-
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: roomStatus.map((room) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: room["color"],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    room["label"],
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    room["count"].toString(),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ),
 
       // BOTTOM NAV BAR
       bottomNavigationBar: Container(
