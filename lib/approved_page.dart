@@ -19,28 +19,28 @@ class _ApprovedPageState extends State<ApprovedPage> {
       'capacity': '4',
       'date': 'Oct 1, 2025',
       'time': '08:00 - 10:00',
-      'image': 'assets/images/room1.jpg'
+      'image': 'assets/images/Room1.jpg'
     },
     {
       'room': 'Room 2',
       'capacity': '8',
       'date': 'Oct 1, 2025',
       'time': '08:00 - 10:00',
-      'image': 'assets/images/room2.jpg'
+      'image': 'assets/images/Room2.jpg'
     },
     {
       'room': 'Room 3',
       'capacity': '16',
       'date': 'Oct 1, 2025',
       'time': '08:30 - 10:00',
-      'image': 'assets/images/room3.jpg'
+      'image': 'assets/images/Room3.jpg'
     },
     {
       'room': 'Room 4',
       'capacity': '4',
       'date': 'Oct 1, 2025',
       'time': '08:00 - 10:00',
-      'image': 'assets/images/room1.jpg'
+      'image': 'assets/images/Room1.jpg'
     },
   ];
 
