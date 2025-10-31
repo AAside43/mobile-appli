@@ -76,10 +76,11 @@ class DashboardPage extends StatelessWidget {
         ],
       ),
 
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: roomStatus.map((room) {
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: roomStatus.map((room) {
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
@@ -112,6 +113,7 @@ class DashboardPage extends StatelessWidget {
               ),
             );
           }).toList(),
+          ),
         ),
       ),
 
