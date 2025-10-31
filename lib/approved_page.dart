@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+// Make sure these paths are correct for your project structure
 import 'dashboard_page.dart';
 import 'room_page.dart';
 import 'history_page.dart';
@@ -10,41 +11,54 @@ class ApprovedPage extends StatefulWidget {
   State<ApprovedPage> createState() => _ApprovedPageState();
 }
 
+// Dummy data moved outside the class to be used in initState
+final List<Map<String, String>> _dummyRequests = [
+  {
+    'room': 'Room 1',
+    'capacity': '4',
+    'date': 'Oct 1, 2025',
+    'time': '08:00 - 10:00',
+    // FIX 1: Reverted to Image.asset and using case-sensitive filenames
+    // from your screenshot (e.g., Room1.jpg, not room1.jpg)
+    'image': 'assets/images/Room1.jpg'
+  },
+  {
+    'room': 'Room 2',
+    'capacity': '8',
+    'date': 'Oct 1, 2025',
+    'time': '08:00 - 10:00',
+    'image': 'assets/images/Room2.jpg'
+  },
+  {
+    'room': 'Room 3',
+    'capacity': '16',
+    'date': 'Oct 1, 2025',
+    'time': '08:30 - 10:00',
+    'image': 'assets/images/Room3.jpg'
+  },
+  {
+    'room': 'Room 4',
+    'capacity': '4',
+    'date': 'Oct 1, 2025',
+    'time': '08:00 - 10:00',
+    'image': 'assets/images/Room1.jpg' // Re-using Room1.jpg as in your original code
+  },
+];
+
 class _ApprovedPageState extends State<ApprovedPage> {
   int selectedIndex = 2; // this page = Check Request Tab
+  late List<Map<String, String>> _requests; // Mutable list for state
 
-  final List<Map<String, String>> requests = [
-    {
-      'room': 'Room 1',
-      'capacity': '4',
-      'date': 'Oct 1, 2025',
-      'time': '08:00 - 10:00',
-      'image': 'assets/images/Room1.jpg'
-    },
-    {
-      'room': 'Room 2',
-      'capacity': '8',
-      'date': 'Oct 1, 2025',
-      'time': '08:00 - 10:00',
-      'image': 'assets/images/Room2.jpg'
-    },
-    {
-      'room': 'Room 3',
-      'capacity': '16',
-      'date': 'Oct 1, 2025',
-      'time': '08:30 - 10:00',
-      'image': 'assets/images/Room3.jpg'
-    },
-    {
-      'room': 'Room 4',
-      'capacity': '4',
-      'date': 'Oct 1, 2025',
-      'time': '08:00 - 10:00',
-      'image': 'assets/images/Room1.jpg'
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Initialize the mutable list from the dummy data
+    _requests = List.from(_dummyRequests);
+  }
 
   void onTabTapped(int index) {
+    if (index == selectedIndex) return; // Don't navigate to the same page
+
     setState(() {
       selectedIndex = index;
     });
@@ -57,10 +71,28 @@ class _ApprovedPageState extends State<ApprovedPage> {
           context, MaterialPageRoute(builder: (_) => RoomPage()));
     } else if (index == 2) {
       // CURRENT PAGE: Approved / Check Request page
+      // No navigation needed
     } else if (index == 3) {
       Navigator.pushReplacement(
           context, MaterialPageRoute(builder: (_) => HistoryPage()));
     }
+  }
+
+  // Function to handle processing the request (accept or reject)
+  void _processRequest(int index, String status) {
+    final roomName = _requests[index]['room'];
+
+    setState(() {
+      _requests.removeAt(index);
+    });
+
+    // Show a snackbar to confirm the action
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$roomName request has been $status.'),
+        backgroundColor: status == 'Accepted' ? Colors.green : Colors.red,
+      ),
+    );
   }
 
   @override
@@ -81,20 +113,36 @@ class _ApprovedPageState extends State<ApprovedPage> {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              // Example of how to refresh the list
+              setState(() {
+                _requests = List.from(_dummyRequests);
+              });
+            },
             icon: const Icon(Icons.refresh, color: Colors.black),
           ),
         ],
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: requests.length,
-        itemBuilder: (context, index) {
-          return _buildRequestCard(requests[index]);
-        },
-      ),
+      body: _requests.isEmpty
+          ? const Center(
+              child: Text(
+                'No pending requests.',
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: _requests.length,
+              itemBuilder: (context, index) {
+                return _buildRequestCard(
+                  _requests[index],
+                  () => _processRequest(index, 'Accepted'),
+                  () => _processRequest(index, 'Rejected'),
+                );
+              },
+            ),
 
-      /// ✅ Bottom Navigation Bar added
+      /// ✅ Bottom Navigation Bar
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -122,7 +170,7 @@ class _ApprovedPageState extends State<ApprovedPage> {
               icon: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: const BoxDecoration(
-                  color: Color(0xFFFFA726),
+                  color: Color(0xFFFFA726), // Orange color for active tab
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.checklist_rtl, color: Colors.white),
@@ -130,14 +178,18 @@ class _ApprovedPageState extends State<ApprovedPage> {
               label: "Check Request",
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.history), label: "History"),
+                icon: Icon(Icons.history), label: "History"),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildRequestCard(Map<String, String> data) {
+  Widget _buildRequestCard(
+    Map<String, String> data,
+    VoidCallback onAccept,
+    VoidCallback onReject,
+  ) {
     return Card(
       elevation: 3,
       margin: const EdgeInsets.only(bottom: 15),
@@ -149,11 +201,19 @@ class _ApprovedPageState extends State<ApprovedPage> {
               topLeft: Radius.circular(12),
               bottomLeft: Radius.circular(12),
             ),
+            // FIX 1: Changed back to Image.asset
             child: Image.asset(
               data['image']!,
               width: 120,
               height: 110,
               fit: BoxFit.cover,
+              // Add an error builder for robustness
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 120,
+                height: 110,
+                color: Colors.grey[200],
+                child: const Icon(Icons.broken_image, color: Colors.grey),
+              ),
             ),
           ),
           Expanded(
@@ -169,11 +229,24 @@ class _ApprovedPageState extends State<ApprovedPage> {
                   Text("Date : ${data['date']}"),
                   Text("Time : ${data['time']}"),
                   const SizedBox(height: 6),
+                  // FIX 2: Wrapped buttons in Expanded to prevent overflow
                   Row(
                     children: [
-                      _actionButton("Accept", Colors.green),
+                      Expanded(
+                        child: _actionButton(
+                          "Accept",
+                          Colors.green,
+                          onAccept,
+                        ),
+                      ),
                       const SizedBox(width: 6),
-                      _actionButton("Reject", Colors.red),
+                      Expanded(
+                        child: _actionButton(
+                          "Reject",
+                          Colors.red,
+                          onReject,
+                        ),
+                      ),
                     ],
                   )
                 ],
@@ -185,13 +258,26 @@ class _ApprovedPageState extends State<ApprovedPage> {
     );
   }
 
-  Widget _actionButton(String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-          color: color, borderRadius: BorderRadius.circular(20)),
-      child: Text(text,
-          style: const TextStyle(color: Colors.white, fontSize: 12)),
+  // Changed this to an ElevatedButton for better layout control and click handling
+  Widget _actionButton(String text, Color color, VoidCallback onPressed) {
+    return SizedBox(
+      height: 32,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+        // Ensures text doesn't wrap and fits
+        child: Text(text, overflow: TextOverflow.ellipsis, maxLines: 1),
+      ),
     );
   }
 }
+
