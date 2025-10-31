@@ -293,10 +293,10 @@ class _RoomPageState extends State<RoomPage> {
                                 return Expanded(
                                   child: GestureDetector(
                                     onTap: status == "Free"
-                                        ? () => _showBookingDialog(
+                                        ? () => {} /*_showBookingDialog(
                                               room["name"],
                                               timeSlots[statusIndex],
-                                            )
+                                            )*/
                                         : null,
                                     child: Container(
                                       margin: const EdgeInsets.symmetric(
