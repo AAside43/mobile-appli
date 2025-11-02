@@ -34,11 +34,11 @@ static List<Map<String, dynamic>> rooms = [
 
     {
       "name": "Room 1",
-      "status": ["Free", "Reserved", "Pending", "Disabled"]
+      "status": ["Free", "Reserved", "Reserved", "Reserved"]
     },
     {
       "name": "Room 2",
-      "status": ["Free", "Free", "Pending", "Disabled"]
+      "status": ["Free", "Free", "Pending", "Reserved"]
     },
     {
       "name": "Room 3",
