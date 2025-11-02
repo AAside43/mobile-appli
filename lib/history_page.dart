@@ -35,59 +35,22 @@ class HistoryPage extends StatelessWidget {
       }
     }
 
-    // ✅ ถ้ามี history จาก RoomPage ให้ใช้ข้อมูลจริง
-    final List<Map<String, dynamic>> historyList = history != null && history!.isNotEmpty
-        ? history!
-            .map((item) => {
-                  "room": item["room"],
-                  "capacity": "-",
-                  "date": "Oct 5, 2025",
-                  "time": item["time"],
-                  "reserved": "Student A",
-                  "approved": "Lecturer CE",
-                  "reason": item["reason"],
-                  "status": item["status"] ?? "Pending",
-                })
-            .toList()
-        : [
-            // ✅ ข้อมูลตัวอย่างเดิมของคุณ (fallback)
-            {
-              "room": "ROOM 1",
-              "capacity": "4 People",
+    // ✅ ใช้ข้อมูลจริงจาก RoomPage เท่านั้น
+final List<Map<String, dynamic>> historyList = history != null && history!.isNotEmpty
+    ? history!
+        .map((item) => {
+              "room": item["room"],
+              "capacity": "-",
               "date": "Oct 5, 2025",
-              "time": "08:00 - 10:00",
+              "time": item["time"],
               "reserved": "Student A",
-              "approved": "Lecturer A",
-              "status": "Approved"
-            },
-            {
-              "room": "ROOM 2",
-              "capacity": "8 People",
-              "date": "Oct 5, 2025",
-              "time": "10:00 - 12:00",
-              "reserved": "Student A",
-              "approved": "Lecturer B",
-              "status": "Approved"
-            },
-            {
-              "room": "ROOM 3",
-              "capacity": "16 People",
-              "date": "Oct 5, 2025",
-              "time": "13:00 - 15:00",
-              "reserved": "Student A",
-              "approved": "Lecturer C",
-              "status": "Rejected"
-            },
-            {
-              "room": "ROOM 4",
-              "capacity": "16 People",
-              "date": "Oct 5, 2025",
-              "time": "15:00 - 17:00",
-              "reserved": "Student A",
-              "approved": "Lecturer D",
-              "status": "Rejected"
-            },
-          ];
+              "approved": "Lecturer CE",
+              "reason": item["reason"],
+              "status": item["status"] ?? "Pending",
+            })
+        .toList()
+    : [];
+
 
     return Scaffold(
       backgroundColor: Colors.white,

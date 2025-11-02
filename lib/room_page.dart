@@ -29,7 +29,9 @@ class _RoomPageState extends State<RoomPage> {
     '15:00-17:00',
   ];
 
-  final List<Map<String, dynamic>> rooms = [
+// ✅ เปลี่ยน final → static เพื่อให้ค่าถูกจำไว้ข้ามหน้า
+static List<Map<String, dynamic>> rooms = [
+
     {
       "name": "Room 1",
       "status": ["Free", "Reserved", "Pending", "Disabled"]
@@ -69,79 +71,90 @@ class _RoomPageState extends State<RoomPage> {
     }
   }
 
-  // ✅ ฟังก์ชัน popup พร้อมบันทึกข้อมูลจริง
-  void _showBookingDialog(String roomName, String timeSlot) {
-    final TextEditingController reasonController = TextEditingController();
+ // ✅ ฟังก์ชัน popup พร้อมบันทึกข้อมูลจริง + เปลี่ยนสถานะในตาราง
+void _showBookingDialog(String roomName, String timeSlot) {
+  final TextEditingController reasonController = TextEditingController();
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Column(
-            children: [
-              Text("Booking $roomName",
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 20)),
-              const SizedBox(height: 6),
-              Text("Time : $timeSlot",
-                  style: const TextStyle(color: Colors.black54, fontSize: 14)),
-            ],
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Column(
+          children: [
+            Text("Booking $roomName",
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 20)),
+            const SizedBox(height: 6),
+            Text("Time : $timeSlot",
+                style: const TextStyle(color: Colors.black54, fontSize: 14)),
+          ],
+        ),
+        content: TextField(
+          controller: reasonController,
+          decoration: InputDecoration(
+            hintText: "Enter reason for booking...",
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           ),
-          content: TextField(
-            controller: reasonController,
-            decoration: InputDecoration(
-              hintText: "Enter reason for booking...",
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            ),
-          ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            ElevatedButton(
-              onPressed: () {
-                final reason = reasonController.text.trim();
-                Navigator.pop(context);
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              final reason = reasonController.text.trim();
+              Navigator.pop(context);
 
-                // ✅ บันทึกประวัติ
-                setState(() {
-                  _bookingHistory.add({
-                    "room": roomName,
-                    "time": timeSlot,
-                    "reason": reason.isEmpty ? "—" : reason,
-                    "status": "Pending",
-                  });
+              // ✅ บันทึกประวัติ
+              setState(() {
+                _bookingHistory.add({
+                  "room": roomName,
+                  "time": timeSlot,
+                  "reason": reason.isEmpty ? "—" : reason,
+                  "status": "Pending",
                 });
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text("✅ $roomName booked for $timeSlot",
-                        textAlign: TextAlign.center),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFA726),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Text("Book Now", style: TextStyle(color: Colors.white)),
-              ),
+                // ✅ อัปเดตสถานะห้องในตารางให้เป็น Pending (แทน Free)
+                for (var room in rooms) {
+                  if (room["name"] == roomName) {
+                    int timeIndex = timeSlots.indexOf(timeSlot);
+                    if (timeIndex != -1 &&
+                        room["status"][timeIndex] == "Free") {
+                      room["status"][timeIndex] = "Pending";
+                    }
+                    break;
+                  }
+                }
+              });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("✅ $roomName booked for $timeSlot",
+                      textAlign: TextAlign.center),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFA726),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Text("Book Now", style: TextStyle(color: Colors.white)),
             ),
-          ],
-        );
-      },
-    );
-  }
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 
   // ✅ ฟังก์ชันส่งข้อมูลประวัติให้หน้า HistoryPage
   List<Map<String, String>> getBookingHistory() => _bookingHistory;
@@ -160,38 +173,52 @@ class _RoomPageState extends State<RoomPage> {
                 color: Colors.black)),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 26),
+ IconButton(
+  icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 26),
+  onPressed: () {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Logout",
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text("Are you sure you want to log out?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
             onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text("Logout",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  content: const Text("Are you sure you want to log out?"),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("Cancel"),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const LoginPage()),
-                          (route) => false,
-                        );
-                      },
-                      child: const Text("Logout",
-                          style: TextStyle(color: Colors.red)),
-                    ),
-                  ],
-                ),
+              Navigator.pop(context);
+
+              // ✅ เพิ่มบรรทัดนี้: รีเซ็ตห้องทั้งหมดกลับเป็น Free
+              setState(() {
+                for (var room in rooms) {
+                  for (int i = 0; i < room["status"].length; i++) {
+                    if (room["status"][i] != "Disabled") {
+                      room["status"][i] = "Free";
+                    }
+                  }
+                }
+                _bookingHistory.clear(); // เคลียร์ประวัติการจอง
+              });
+
+              // ✅ กลับไปหน้า LoginPage
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
               );
             },
+            child:
+                const Text("Logout", style: TextStyle(color: Colors.red)),
           ),
+        ],
+      ),
+    );
+  },
+),
+
         ],
       ),
       body: Padding(
@@ -221,53 +248,41 @@ class _RoomPageState extends State<RoomPage> {
 // ✅ เพิ่มระยะห่างระหว่างช่องวันที่กับช่องเวลา
             const SizedBox(height: 12),
 
-
-            // ตารางเวลา (คงเดิม)
-            SizedBox(
-              height: 45,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: timeSlots.length + 1,
-                separatorBuilder: (context, index) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.black26),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(
-                        child: Text("Room/Time",
-                            style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87)),
-                      ),
-                    );
-                  } else {
-                    final slot = timeSlots[index - 1];
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.black26),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(slot,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                                color: Colors.black87)),
-                      ),
-                    );
-                  }
-                },
+// ✅ ตารางเวลา (ฟิกซ์หัวตารางไม่เลื่อน)
+Padding(
+  padding: const EdgeInsets.symmetric(vertical: 6),
+  child: Row(
+    children: [
+      const SizedBox(
+        width: 70,
+        child: Text(
+          "Room/Time",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+      ),
+      // หัวตารางเวลาแบบฟิกซ์ตรงกับคอลัมน์ของห้อง
+      ...timeSlots.map(
+        (slot) => Expanded(
+          child: Center(
+            child: Text(
+              slot,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: Colors.black87,
               ),
             ),
-            const SizedBox(height: 10),
-            const Divider(thickness: 1, height: 20),
+          ),
+        ),
+      ),
+    ],
+  ),
+),
+const Divider(thickness: 1, height: 20),
+
 
             // ✅ ตารางห้อง (อัปเดต)
             Expanded(
@@ -355,19 +370,22 @@ class _RoomPageState extends State<RoomPage> {
             if (index == 0) {
               Navigator.pushReplacement(context,MaterialPageRoute(builder: (context) => const HomePage()));
 
-            } else if (index == 2) {
-              Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const CheckRequestPage()));
-            } else if (index == 3) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HistoryPage(history: _bookingHistory),
-                ),
-              );
-            }
+        } else if (index == 2) {
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (context) => CheckRequestPage(history: _bookingHistory),
+    ),
+  );
+} else if (index == 3) {
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (context) => HistoryPage(history: _bookingHistory),
+    ),
+  );
+}
+
           },
           items: [
             const BottomNavigationBarItem(

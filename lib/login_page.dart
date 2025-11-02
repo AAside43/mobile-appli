@@ -23,26 +23,38 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  // ✅ ฟังก์ชัน Login (แก้ตรงนี้)
-  void _login() {
-    // ถ้ามีการกรอกครบทั้ง 2 ช่อง
-    if (_studentIdController.text.isNotEmpty &&
-        _passwordController.text.isNotEmpty) {
+  // ✅ ฟังก์ชัน Login (แก้ตามนี้)
+void _login() {
+  // ถ้ามีการกรอกครบทั้ง 2 ช่อง
+  if (_studentIdController.text.isNotEmpty &&
+      _passwordController.text.isNotEmpty) {
+    // ตรวจสอบว่ารหัสผ่านมี 6 ตัว
+    if (_passwordController.text.length == 6) {
       // ไปหน้า HomePage
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
     } else {
-      // ถ้ายังไม่กรอกช่องใดช่องหนึ่ง ให้แจ้งเตือน
+      // ถ้ารหัสผ่านไม่ครบ 6 ตัว ให้แจ้งเตือน
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Please enter both Student ID and Password."),
-          backgroundColor: Colors.redAccent,
+          content: Text("Password must be exactly 6 characters."),
+          backgroundColor: Colors.orangeAccent,
         ),
       );
     }
+  } else {
+    // ถ้ายังไม่กรอกช่องใดช่องหนึ่ง ให้แจ้งเตือน
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Please enter both Student ID and Password."),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
