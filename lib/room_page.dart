@@ -11,15 +11,23 @@ import '้home_page.dart';
 class RoomPage extends StatefulWidget {
   const RoomPage({Key? key}) : super(key: key);
 
+  // ✅ ใช้ Static Getter ให้หน้าอื่นเรียกข้อมูลได้โดยตรง
+  static List<Map<String, String>> getBookingHistory() =>
+      _RoomPageState._bookingHistory;
+
   @override
   State<RoomPage> createState() => _RoomPageState();
+
+  // ✅ เพิ่มฟังก์ชันนี้ เพื่อให้หน้าอื่นสามารถรีเซ็ตค่าทุกอย่างได้
+  static void resetAll() {
+    _RoomPageState._resetStatic();
+  }
 }
 
 class _RoomPageState extends State<RoomPage> {
-  // ignore: unused_field
   int _selectedIndex = 1;
 
-  // 🧠 ตัวแปรเก็บประวัติการจอง
+  // 🧠 ตัวแปรเก็บประวัติการจอง (แชร์ข้ามหน้า)
   static List<Map<String, String>> _bookingHistory = [];
 
   final List<String> timeSlots = [
@@ -29,9 +37,8 @@ class _RoomPageState extends State<RoomPage> {
     '15:00-17:00',
   ];
 
-// ✅ เปลี่ยน final → static เพื่อให้ค่าถูกจำไว้ข้ามหน้า
-static List<Map<String, dynamic>> rooms = [
-
+  // ✅ ตารางห้องแบบ Static เพื่อจำสถานะข้ามหน้า
+  static List<Map<String, dynamic>> rooms = [
     {
       "name": "Room 1",
       "status": ["Free", "Reserved", "Reserved", "Reserved"]
@@ -71,93 +78,129 @@ static List<Map<String, dynamic>> rooms = [
     }
   }
 
- // ✅ ฟังก์ชัน popup พร้อมบันทึกข้อมูลจริง + เปลี่ยนสถานะในตาราง
-void _showBookingDialog(String roomName, String timeSlot) {
-  final TextEditingController reasonController = TextEditingController();
+  // ✅ Popup จองห้อง
+  void _showBookingDialog(String roomName, String timeSlot) {
+    final TextEditingController reasonController = TextEditingController();
 
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Column(
-          children: [
-            Text("Booking $roomName",
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 20)),
-            const SizedBox(height: 6),
-            Text("Time : $timeSlot",
-                style: const TextStyle(color: Colors.black54, fontSize: 14)),
-          ],
-        ),
-        content: TextField(
-          controller: reasonController,
-          decoration: InputDecoration(
-            hintText: "Enter reason for booking...",
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Column(
+            children: [
+              Text("Booking $roomName",
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 20)),
+              const SizedBox(height: 6),
+              Text("Time : $timeSlot",
+                  style: const TextStyle(color: Colors.black54, fontSize: 14)),
+            ],
           ),
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              final reason = reasonController.text.trim();
-              Navigator.pop(context);
+          content: TextField(
+            controller: reasonController,
+            decoration: InputDecoration(
+              hintText: "Enter reason for booking...",
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                final reason = reasonController.text.trim();
+                Navigator.pop(context);
 
-              // ✅ บันทึกประวัติ
-              setState(() {
-                _bookingHistory.add({
-                  "room": roomName,
-                  "time": timeSlot,
-                  "reason": reason.isEmpty ? "—" : reason,
-                  "status": "Pending",
+                setState(() {
+                  _bookingHistory.add({
+                    "room": roomName,
+                    "time": timeSlot,
+                    "reason": reason.isEmpty ? "—" : reason,
+                    "status": "Pending",
+                    "reservedBy": "Student A",
+                    "approvedBy": "Lecturer CE",
+                  });
+
+                  for (var room in rooms) {
+                    if (room["name"] == roomName) {
+                      int timeIndex = timeSlots.indexOf(timeSlot);
+                      if (timeIndex != -1 &&
+                          room["status"][timeIndex] == "Free") {
+                        room["status"][timeIndex] = "Pending";
+                      }
+                      break;
+                    }
+                  }
                 });
 
-                // ✅ อัปเดตสถานะห้องในตารางให้เป็น Pending (แทน Free)
-                for (var room in rooms) {
-                  if (room["name"] == roomName) {
-                    int timeIndex = timeSlots.indexOf(timeSlot);
-                    if (timeIndex != -1 &&
-                        room["status"][timeIndex] == "Free") {
-                      room["status"][timeIndex] = "Pending";
-                    }
-                    break;
-                  }
-                }
-              });
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("✅ $roomName booked for $timeSlot",
-                      textAlign: TextAlign.center),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFFA726),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("✅ $roomName booked for $timeSlot",
+                        textAlign: TextAlign.center),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFA726),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Text("Book Now", style: TextStyle(color: Colors.white)),
+              ),
             ),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Text("Book Now", style: TextStyle(color: Colors.white)),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
             ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-        ],
-      );
-    },
-  );
-}
+          ],
+        );
+      },
+    );
+  }
 
+  // ✅ รีเซ็ตข้อมูลตอน Logout
+  void _resetAll() {
+    setState(() {
+      _resetStatic();
+    });
+  }
 
-  // ✅ ฟังก์ชันส่งข้อมูลประวัติให้หน้า HistoryPage
-  List<Map<String, String>> getBookingHistory() => _bookingHistory;
+  // ✅ ฟังก์ชัน static สำหรับใช้รีเซ็ตข้อมูลจากหน้าอื่น (ไม่ต้อง setState)
+  static void _resetStatic() {
+    _bookingHistory.clear();
+    rooms = [
+      {
+        "name": "Room 1",
+        "status": ["Free", "Reserved", "Reserved", "Reserved"]
+      },
+      {
+        "name": "Room 2",
+        "status": ["Free", "Free", "Pending", "Reserved"]
+      },
+      {
+        "name": "Room 3",
+        "status": ["Disabled", "Disabled", "Disabled", "Disabled"]
+      },
+      {
+        "name": "Room 4",
+        "status": ["Free", "Pending", "Free", "Free"]
+      },
+      {
+        "name": "Room 5",
+        "status": ["Pending", "Free", "Reserved", "Free"]
+      },
+      {
+        "name": "Room 6",
+        "status": ["Free", "Free", "Free", "Pending"]
+      },
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -173,118 +216,81 @@ void _showBookingDialog(String roomName, String timeSlot) {
                 color: Colors.black)),
         centerTitle: true,
         actions: [
- IconButton(
-  icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 26),
-  onPressed: () {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Logout",
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text("Are you sure you want to log out?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 26),
             onPressed: () {
-              Navigator.pop(context);
-
-              // ✅ เพิ่มบรรทัดนี้: รีเซ็ตห้องทั้งหมดกลับเป็น Free
-              setState(() {
-                for (var room in rooms) {
-                  for (int i = 0; i < room["status"].length; i++) {
-                    if (room["status"][i] != "Disabled") {
-                      room["status"][i] = "Free";
-                    }
-                  }
-                }
-                _bookingHistory.clear(); // เคลียร์ประวัติการจอง
-              });
-
-              // ✅ กลับไปหน้า LoginPage
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginPage()),
-                (route) => false,
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Logout",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  content: const Text(
+                      "Are you sure you want to log out and reset all data?"),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Cancel")),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _resetAll();
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const LoginPage()),
+                          (route) => false,
+                        );
+                      },
+                      child: const Text("Logout",
+                          style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
               );
             },
-            child:
-                const Text("Logout", style: TextStyle(color: Colors.red)),
           ),
-        ],
-      ),
-    );
-  },
-),
-
         ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // วันที่
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.black, width: 1.5),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Row(
-                children: const [
+              child: const Row(
+                children: [
                   Icon(Icons.calendar_today_outlined,
                       color: Colors.black54, size: 18),
                   SizedBox(width: 8),
-                  Text(
-                    "Today: Oct 5, 2025",
-                    style: TextStyle(fontSize: 14, color: Colors.black87),
-                  ),
+                  Text("Today: Oct 5, 2025",
+                      style: TextStyle(fontSize: 14, color: Colors.black87)),
                 ],
               ),
             ),
-
-// ✅ เพิ่มระยะห่างระหว่างช่องวันที่กับช่องเวลา
             const SizedBox(height: 12),
-
-// ✅ ตารางเวลา (ฟิกซ์หัวตารางไม่เลื่อน)
-Padding(
-  padding: const EdgeInsets.symmetric(vertical: 6),
-  child: Row(
-    children: [
-      const SizedBox(
-        width: 70,
-        child: Text(
-          "Room/Time",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-      ),
-      // หัวตารางเวลาแบบฟิกซ์ตรงกับคอลัมน์ของห้อง
-      ...timeSlots.map(
-        (slot) => Expanded(
-          child: Center(
-            child: Text(
-              slot,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-                color: Colors.black87,
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  const SizedBox(
+                      width: 70,
+                      child: Text("Room/Time",
+                          style: TextStyle(fontWeight: FontWeight.bold))),
+                  ...timeSlots.map((slot) => Expanded(
+                        child: Center(
+                            child: Text(slot,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13))),
+                      )),
+                ],
               ),
             ),
-          ),
-        ),
-      ),
-    ],
-  ),
-),
-const Divider(thickness: 1, height: 20),
-
-
-            // ✅ ตารางห้อง (อัปเดต)
+            const Divider(thickness: 1, height: 20),
             Expanded(
               child: ListView.builder(
                 itemCount: rooms.length,
@@ -295,11 +301,10 @@ const Divider(thickness: 1, height: 20),
                     child: Row(
                       children: [
                         SizedBox(
-                          width: 60,
-                          child: Text(room["name"],
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 14)),
-                        ),
+                            width: 60,
+                            child: Text(room["name"],
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold))),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Row(
@@ -347,8 +352,6 @@ const Divider(thickness: 1, height: 20),
           ],
         ),
       ),
-
-      // ✅ ส่งข้อมูลไป HistoryPage
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -368,24 +371,24 @@ const Divider(thickness: 1, height: 20),
           showUnselectedLabels: true,
           onTap: (index) {
             if (index == 0) {
-              Navigator.pushReplacement(context,MaterialPageRoute(builder: (context) => const HomePage()));
-
-        } else if (index == 2) {
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (context) => CheckRequestPage(history: _bookingHistory),
-    ),
-  );
-} else if (index == 3) {
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (context) => HistoryPage(history: _bookingHistory),
-    ),
-  );
-}
-
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (_) => const HomePage()));
+            } else if (index == 1) {
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (_) => const RoomPage()));
+            } else if (index == 2) {
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) =>
+                          const CheckRequestPage())); // ✅ หน้าเช็คคำขอ
+            } else if (index == 3) {
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) =>
+                          const HistoryPage())); // ✅ หน้าประวัติการจอง
+            }
           },
           items: [
             const BottomNavigationBarItem(
@@ -399,8 +402,8 @@ const Divider(thickness: 1, height: 20),
                   color: Color(0xFFFFA726),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.meeting_room_outlined,
-                    color: Colors.white),
+                child:
+                    const Icon(Icons.meeting_room_outlined, color: Colors.white),
               ),
               label: "Room",
             ),

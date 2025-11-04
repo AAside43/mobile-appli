@@ -7,18 +7,30 @@ import '้home_page.dart';
 import 'login_page.dart';
 
 class CheckRequestPage extends StatefulWidget {
-  final List<Map<String, String>>? history; // ✅ รับค่ามาจาก RoomPage
-  const CheckRequestPage({Key? key, this.history}) : super(key: key);
+  const CheckRequestPage({Key? key}) : super(key: key);
 
   @override
   State<CheckRequestPage> createState() => _CheckRequestPageState();
 }
 
 class _CheckRequestPageState extends State<CheckRequestPage> {
+  // ✅ จำลองบทบาท (จะมาจาก Login จริงในอนาคต)
+  final String userRole = "student"; // เปลี่ยนเป็น "staff" หรือ "lecturer" ได้
+
   @override
   Widget build(BuildContext context) {
+    // ignore: unused_local_variable
     int selectedIndex = 2;
 
+    // ✅ ดึงข้อมูลจาก RoomPage โดยตรง
+    final List<Map<String, String>> allRequests = RoomPage.getBookingHistory();
+
+    // ✅ แสดงเฉพาะคำขอของตัวเอง (สำหรับ student)
+    final requestList = userRole == "student"
+        ? allRequests.where((req) => req["reservedBy"] == "Student A").toList()
+        : allRequests;
+
+    // ignore: unused_element
     void onTabTapped(int index) {
       if (index == 0) {
         Navigator.pushReplacement(
@@ -28,181 +40,125 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
             context, MaterialPageRoute(builder: (_) => const RoomPage()));
       } else if (index == 3) {
         Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-                builder: (_) => HistoryPage(history: widget.history ?? [])));
+            context, MaterialPageRoute(builder: (_) => const HistoryPage()));
       }
     }
 
-    // ✅ ดึงข้อมูลจริงจากหน้า RoomPage
-    final List<Map<String, dynamic>> requestList =
-        widget.history != null && widget.history!.isNotEmpty
-            ? widget.history!
-                .map((item) => {
-                      "room": item["room"],
-                      "time": item["time"],
-                      "reason": item["reason"],
-                      "status": item["status"] ?? "Pending",
-                    })
-                .toList()
-            : [];
-
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        title: const Text(
-          "Check Request",
-          style: TextStyle(
-              fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 26),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text("Logout",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  content: const Text("Are you sure you want to log out?"),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("Cancel"),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const LoginPage()),
-                          (route) => false,
-                        );
-                      },
-                      child: const Text("Logout",
-                          style: TextStyle(color: Colors.red)),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
-      ),
+     appBar: AppBar(
+  backgroundColor: Colors.white,
+  elevation: 1,
+  centerTitle: true,
+  title: const Text(
+    "Check Request",
+    style: TextStyle(
+      fontWeight: FontWeight.bold,
+      color: Colors.black,
+    ),
+  ),
+  actions: [
+    IconButton(
+      icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 26),
+      onPressed: () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text(
+              "Logout",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: const Text(
+                "Are you sure you want to log out and reset all data?"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancel"),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  // ✅ รีเซ็ตค่าทั้งหมด โดยเรียกฟังก์ชัน reset จาก RoomPage
+                  RoomPage.resetAll();
 
-      // ✅ BODY (สำหรับ Student)
+                  // ✅ กลับไปหน้า LoginPage
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                    (route) => false,
+                  );
+                },
+                child:
+                    const Text("Logout", style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  ],
+),
+
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: requestList.isEmpty
-            ? const Center(
-                child: Text(
-                  "No requests found.",
-                  style: TextStyle(fontSize: 16, color: Colors.black54),
-                ),
-              )
-            : Column(
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+            ? const Center(child: Text("No requests found."))
+            : ListView.builder(
+                itemCount: requestList.length,
+                itemBuilder: (context, index) {
+                  final item = requestList[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black, width: 1.5),
-                      borderRadius: BorderRadius.circular(10),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.1), blurRadius: 8)
+                      ],
                     ),
                     child: Row(
-                      children: const [
-                        Icon(Icons.calendar_today_outlined,
-                            color: Colors.black54),
-                        SizedBox(width: 10),
-                        Text(
-                          "Today: Oct 5, 2025",
-                          style:
-                              TextStyle(fontSize: 15, color: Colors.black87),
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(item["room"] ?? "-",
+                                  style: const TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              Text("Date : ${item["date"] ?? "Oct 5, 2025"}"),
+                              Text("Time: ${item["time"]}"),
+                              Text("Reason: ${item["reason"]}"),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: item["status"] == "Pending"
+                                ? Colors.amber
+                                : item["status"] == "Approved"
+                                    ? Colors.green
+                                    : Colors.red,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(item["status"]!,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 15),
-
-                  // ✅ แสดงรายการจาก RoomPage (แค่ดู ไม่แก้ไข)
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: requestList.length,
-                      itemBuilder: (context, index) {
-                        final item = requestList[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      item["room"] ?? "Unknown Room",
-                                      style: const TextStyle(
-                                          fontSize: 18,
-                                          color: Color(0xFF3E7BFA),
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    const Text("Capacity: -",
-                                        style: TextStyle(fontSize: 14)),
-                                    const SizedBox(height: 6),
-                                    const Text("Date : Oct 5, 2025"),
-                                    Text("Time : ${item["time"] ?? "-"}"),
-                                    Text("Reason : ${item["reason"] ?? "-"}"),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: item["status"] == "Pending"
-                                      ? Colors.amber
-                                      : item["status"] == "Approved"
-                                          ? Colors.green
-                                          : Colors.red,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  item["status"]!,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
       ),
-
-      // ✅ Bottom Navigation Bar (เหมือนเดิม)
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -215,12 +171,26 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
           ],
         ),
         child: BottomNavigationBar(
-          currentIndex: selectedIndex,
+          currentIndex: 2, // ✅ หน้านี้คือ Check Request
           type: BottomNavigationBarType.fixed,
           selectedItemColor: const Color(0xFFFFA726),
           unselectedItemColor: Colors.black54,
           showUnselectedLabels: true,
-          onTap: onTabTapped,
+          onTap: (index) {
+            if (index == 0) {
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (_) => const HomePage()));
+            } else if (index == 1) {
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (_) => const RoomPage()));
+            } else if (index == 2) {
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const CheckRequestPage()));
+            } else if (index == 3) {
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const HistoryPage()));
+            }
+          },
           items: [
             const BottomNavigationBarItem(
               icon: Icon(Icons.home_filled),

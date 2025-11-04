@@ -7,21 +7,31 @@ import '้home_page.dart';
 import 'login_page.dart';
 
 class HistoryPage extends StatelessWidget {
-  // ✅ เพิ่มพารามิเตอร์รับข้อมูลจาก RoomPage
-  final List<Map<String, String>>? history;
-  const HistoryPage({Key? key, this.history}) : super(key: key);
+  const HistoryPage({Key? key}) : super(key: key);
+
+  // ✅ จำลองบทบาท (student / staff / lecturer)
+  final String userRole = "student";
 
   Color _getStatusColor(String status) {
     if (status == "Approved") return Colors.green;
     if (status == "Rejected") return Colors.red;
-    if (status == "Pending") return Colors.orange;
+    if (status == "Pending") return Colors.amber;
     return Colors.grey;
   }
 
   @override
   Widget build(BuildContext context) {
+    // ignore: unused_local_variable
     int selectedIndex = 3;
 
+    final allHistory = RoomPage.getBookingHistory();
+
+    // ✅ แยกบทบาท
+    final historyList = userRole == "student"
+        ? allHistory.where((h) => h["reservedBy"] == "Student A").toList()
+        : allHistory;
+
+    // ignore: unused_element
     void onTabTapped(int index) {
       if (index == 0) {
         Navigator.pushReplacement(
@@ -35,50 +45,35 @@ class HistoryPage extends StatelessWidget {
       }
     }
 
-    // ✅ ใช้ข้อมูลจริงจาก RoomPage เท่านั้น
-final List<Map<String, dynamic>> historyList = history != null && history!.isNotEmpty
-    ? history!
-        .map((item) => {
-              "room": item["room"],
-              "capacity": "-",
-              "date": "Oct 5, 2025",
-              "time": item["time"],
-              "reserved": "Student A",
-              "approved": "Lecturer CE",
-              "reason": item["reason"],
-              "status": item["status"] ?? "Pending",
-            })
-        .toList()
-    : [];
-
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
+        centerTitle: true,
         title: const Text(
           "History",
           style: TextStyle(
-              fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
         ),
-        centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(
-              Icons.logout_rounded,
-              color: Colors.red,
-              size: 26,
-            ),
+            icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 26),
             onPressed: () {
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   title: const Text(
                     "Logout",
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  content: const Text("Are you sure you want to log out?"),
+                  content: const Text(
+                      "Are you sure you want to log out and reset all data?"),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -87,6 +82,11 @@ final List<Map<String, dynamic>> historyList = history != null && history!.isNot
                     TextButton(
                       onPressed: () {
                         Navigator.pop(context);
+
+                        // ✅ รีเซ็ตค่าทั้งหมดจาก RoomPage
+                        RoomPage.resetAll();
+
+                        // ✅ กลับไปหน้า LoginPage
                         Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(
@@ -110,70 +110,53 @@ final List<Map<String, dynamic>> historyList = history != null && history!.isNot
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: historyList.isEmpty
-            ? const Center(
-                child: Text(
-                  "No booking history yet",
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-              )
+            ? const Center(child: Text("No booking history yet"))
             : ListView.builder(
                 itemCount: historyList.length,
                 itemBuilder: (context, index) {
                   final item = historyList[index];
                   return Container(
-                    margin: const EdgeInsets.only(bottom: 14),
+                    margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
-                        ),
+                            color: Colors.black.withOpacity(0.1), blurRadius: 6)
                       ],
                     ),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item["room"],
-                                style: const TextStyle(
-                                  color: Color(0xFF3E7BFA),
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(item["capacity"]),
-                              const SizedBox(height: 4),
-                              Text("Date : ${item["date"]}"),
-                              Text("Time : ${item["time"]}"),
-                              if (item["reason"] != null)
-                                Text("Reason : ${item["reason"]}"),
-                              Text("Reserved by : ${item["reserved"]}"),
-                              Text("Approved by : ${item["approved"]}"),
-                            ],
-                          ),
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(item["room"] ?? "-",
+                                    style: const TextStyle(
+                                        color: Colors.blue,
+                                        fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                Text("Date : ${item["date"] ?? "Oct 5, 2025"}"),
+                                Text("Time: ${item["time"]}"),
+                                Text("Reason: ${item["reason"]}"),
+                                if (userRole != "student") ...[
+                                  const SizedBox(height: 4),
+                                  Text("Reserved by: ${item["reservedBy"]}"),
+                                  Text("Approved by: ${item["approvedBy"]}"),
+                                ]
+                              ]),
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: _getStatusColor(item["status"]),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            item["status"],
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                              color: _getStatusColor(item["status"] ?? ""),
+                              borderRadius: BorderRadius.circular(8)),
+                          child: Text(item["status"] ?? "",
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
@@ -181,8 +164,6 @@ final List<Map<String, dynamic>> historyList = history != null && history!.isNot
                 },
               ),
       ),
-
-      // ✅ bottom nav (คงเดิม)
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -195,12 +176,26 @@ final List<Map<String, dynamic>> historyList = history != null && history!.isNot
           ],
         ),
         child: BottomNavigationBar(
-          currentIndex: selectedIndex,
+          currentIndex: 3, // ✅ หน้านี้คือ History
           type: BottomNavigationBarType.fixed,
           selectedItemColor: const Color(0xFFFFA726),
           unselectedItemColor: Colors.black54,
           showUnselectedLabels: true,
-          onTap: onTabTapped,
+          onTap: (index) {
+            if (index == 0) {
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (_) => const HomePage()));
+            } else if (index == 1) {
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (_) => const RoomPage()));
+            } else if (index == 2) {
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const CheckRequestPage()));
+            } else if (index == 3) {
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const HistoryPage()));
+            }
+          },
           items: [
             const BottomNavigationBarItem(
               icon: Icon(Icons.home_filled),
