@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_appli_1/home_page.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 // ignore: unused_import
 import 'home_page.dart';
@@ -26,6 +28,10 @@ class RoomPage extends StatefulWidget {
 
 class _RoomPageState extends State<RoomPage> {
   int _selectedIndex = 1;
+  bool _isLoading = true;
+
+  // Server URL
+  static const String serverUrl = 'http://localhost:3000';
 
   // 🧠 ตัวแปรเก็บประวัติการจอง (แชร์ข้ามหน้า)
   static List<Map<String, String>> _bookingHistory = [];
@@ -65,6 +71,46 @@ class _RoomPageState extends State<RoomPage> {
     },
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadRoomsFromServer();
+  }
+
+  // Load rooms from server
+  Future<void> _loadRoomsFromServer() async {
+    try {
+      final response = await http.get(Uri.parse('$serverUrl/rooms'));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        List<dynamic> roomsData = data['rooms'];
+        
+        setState(() {
+          // Update static rooms with database data
+          rooms = roomsData.map((room) {
+            return {
+              "room_id": room['room_id'].toString(),
+              "name": room['name'],
+              "is_available": room['is_available'] == 1,
+              "status": ["Free", "Free", "Free", "Free"] // Default to Free for all slots
+            };
+          }).toList();
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      // If server is not available, use static data
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Color _getColor(String status) {
     switch (status) {
       case "Free":
@@ -81,6 +127,15 @@ class _RoomPageState extends State<RoomPage> {
   // ✅ Popup จองห้อง
   void _showBookingDialog(String roomName, String timeSlot) {
     final TextEditingController reasonController = TextEditingController();
+    
+    // Find room_id from roomName
+    String? roomId;
+    for (var room in rooms) {
+      if (room["name"] == roomName) {
+        roomId = room["room_id"]?.toString();
+        break;
+      }
+    }
 
     showDialog(
       context: context,
@@ -111,9 +166,36 @@ class _RoomPageState extends State<RoomPage> {
           actionsAlignment: MainAxisAlignment.center,
           actions: [
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final reason = reasonController.text.trim();
                 Navigator.pop(context);
+
+                // Book room via server if roomId exists
+                if (roomId != null) {
+                  try {
+                    final response = await http.post(
+                      Uri.parse('$serverUrl/book-room'),
+                      headers: {'Content-Type': 'application/json'},
+                      body: json.encode({
+                        'userId': 1, // Default user ID - should come from login
+                        'roomId': int.parse(roomId),
+                        'status': 'confirmed',
+                      }),
+                    );
+
+                    if (response.statusCode == 201) {
+                      final data = json.decode(response.body);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("✅ ${data['message']}", textAlign: TextAlign.center),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    // Handle offline mode
+                  }
+                }
 
                 setState(() {
                   _bookingHistory.add({

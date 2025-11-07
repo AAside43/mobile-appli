@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'login_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -18,6 +20,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isLoading = false;
+
+  // Server URL - same as login page
+  static const String serverUrl = 'http://localhost:3000';
 
   void _togglePasswordVisibility() {
     setState(() {
@@ -31,14 +37,64 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
-  void _register() {
-    if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Register successful!")),
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('$serverUrl/register'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'username': _usernameController.text,
+          'password': _passwordController.text,
+          'email': _studentIdController.text, // Using student ID as email
+        }),
       );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (response.statusCode == 201) {
+        // Registration successful
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Registration successful! Please login."),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
+      } else {
+        // Registration failed
+        final errorData = json.decode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorData['error'] ?? 'Registration failed'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Connection error: Please make sure the server is running on $serverUrl"),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     }
   }
@@ -286,7 +342,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 width: 180,
                                 height: 42,
                                 child: ElevatedButton(
-                                  onPressed: _register,
+                                  onPressed: _isLoading ? null : _register,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFFFFA726),
                                     shape: RoundedRectangleBorder(
@@ -295,15 +351,24 @@ class _RegisterPageState extends State<RegisterPage> {
                                     elevation: 4,
                                     shadowColor: Colors.black26,
                                   ),
-                                  child: const Text(
-                                    "REGISTER",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text(
+                                          "REGISTER",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
                                 ),
                               ),
                             ),

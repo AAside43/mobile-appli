@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 // ignore: unused_import
 import 'home_page.dart';
 import 'room_page.dart';
@@ -14,21 +16,71 @@ class CheckRequestPage extends StatefulWidget {
 }
 
 class _CheckRequestPageState extends State<CheckRequestPage> {
+  // Server URL
+  static const String serverUrl = 'http://localhost:3000';
+  
   // ✅ จำลองบทบาท (จะมาจาก Login จริงในอนาคต)
   final String userRole = "student"; // เปลี่ยนเป็น "staff" หรือ "lecturer" ได้
+  final int userId = 1; // Default user ID - should come from login
+  
+  List<Map<String, dynamic>> requestList = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBookingRequests();
+  }
+
+  // Load booking requests from server
+  Future<void> _loadBookingRequests() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$serverUrl/user/$userId/bookings'),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        List<dynamic> bookingsData = data['bookings'];
+        
+        setState(() {
+          requestList = bookingsData.map((booking) {
+            return {
+              "booking_id": booking['booking_id'].toString(),
+              "room": booking['room_name'],
+              "room_id": booking['room_id'].toString(),
+              "description": booking['description'] ?? '',
+              "capacity": booking['capacity'].toString(),
+              "status": booking['status'],
+              "reservedBy": "You", // Current user
+            };
+          }).toList();
+          _isLoading = false;
+        });
+      } else {
+        // Fallback to local data if server fails
+        _useLocalRequests();
+      }
+    } catch (e) {
+      // If server is not available, use local data
+      _useLocalRequests();
+    }
+  }
+
+  void _useLocalRequests() {
+    final allRequests = RoomPage.getBookingHistory();
+    setState(() {
+      requestList = userRole == "student"
+          ? allRequests.where((req) => req["reservedBy"] == "Student A").toList()
+          : allRequests;
+      _isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     // ignore: unused_local_variable
     int selectedIndex = 2;
-
-    // ✅ ดึงข้อมูลจาก RoomPage โดยตรง
-    final List<Map<String, String>> allRequests = RoomPage.getBookingHistory();
-
-    // ✅ แสดงเฉพาะคำขอของตัวเอง (สำหรับ student)
-    final requestList = userRole == "student"
-        ? allRequests.where((req) => req["reservedBy"] == "Student A").toList()
-        : allRequests;
 
     // ignore: unused_element
     void onTabTapped(int index) {
@@ -46,7 +98,7 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-     appBar: AppBar(
+      appBar: AppBar(
   backgroundColor: Colors.white,
   elevation: 1,
   centerTitle: true,
@@ -101,61 +153,120 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
   ],
 ),
 
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: requestList.isEmpty
-            ? const Center(child: Text("No requests found."))
-            : ListView.builder(
-                itemCount: requestList.length,
-                itemBuilder: (context, index) {
-                  final item = requestList[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                            color: Colors.black.withOpacity(0.1), blurRadius: 8)
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(item["room"] ?? "-",
-                                  style: const TextStyle(
-                                      color: Colors.blue,
-                                      fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              Text("Date : ${item["date"] ?? "Oct 5, 2025"}"),
-                              Text("Time: ${item["time"]}"),
-                              Text("Reason: ${item["reason"]}"),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFFFFA726),
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: requestList.isEmpty
+                  ? const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.pending_actions,
+                              size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            "No booking requests found",
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: requestList.length,
+                      itemBuilder: (context, index) {
+                        final item = requestList[index];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 8)
                             ],
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: item["status"] == "Pending"
-                                ? Colors.amber
-                                : item["status"] == "Approved"
-                                    ? Colors.green
-                                    : Colors.red,
-                            borderRadius: BorderRadius.circular(8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.meeting_room,
+                                            size: 20, color: Color(0xFF3E7BFA)),
+                                        const SizedBox(width: 8),
+                                        Text(item["room"] ?? "-",
+                                            style: const TextStyle(
+                                                color: Color(0xFF3E7BFA),
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    if (item["description"] != null &&
+                                        item["description"]!.isNotEmpty)
+                                      Text(
+                                          "Description: ${item["description"]}",
+                                          style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.black87)),
+                                    if (item["capacity"] != null)
+                                      Text(
+                                          "Capacity: ${item["capacity"]} people",
+                                          style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.black87)),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                        "Booking ID: ${item["booking_id"] ?? "-"}",
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.black54)),
+                                    if (item["time"] != null)
+                                      Text("Time: ${item["time"]}",
+                                          style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.black87)),
+                                    if (item["reason"] != null)
+                                      Text("Reason: ${item["reason"]}",
+                                          style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.black87)),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: item["status"] == "pending"
+                                      ? Colors.amber
+                                      : item["status"] == "confirmed"
+                                          ? Colors.green
+                                          : item["status"] == "cancelled"
+                                              ? Colors.red
+                                              : Colors.grey,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(item["status"] ?? "Unknown",
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold)),
+                              ),
+                            ],
                           ),
-                          child: Text(item["status"]!,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                  );
+                        );
                 },
               ),
       ),

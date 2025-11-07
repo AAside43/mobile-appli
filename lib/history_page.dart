@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 // ignore: unused_import
 import 'home_page.dart';
 import 'room_page.dart';
@@ -6,11 +8,74 @@ import 'checkrequest_page.dart';
 import '้home_page.dart';
 import 'login_page.dart';
 
-class HistoryPage extends StatelessWidget {
+class HistoryPage extends StatefulWidget {
   const HistoryPage({Key? key}) : super(key: key);
 
+  @override
+  State<HistoryPage> createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+  // Server URL
+  static const String serverUrl = 'http://localhost:3000';
+  
   // ✅ จำลองบทบาท (student / staff / lecturer)
   final String userRole = "student";
+  final int userId = 1; // Default user ID - should come from login
+  
+  List<Map<String, dynamic>> historyList = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBookingHistory();
+  }
+
+  // Load booking history from server
+  Future<void> _loadBookingHistory() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$serverUrl/user/$userId/bookings'),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        List<dynamic> bookingsData = data['bookings'];
+        
+        setState(() {
+          historyList = bookingsData.map((booking) {
+            return {
+              "booking_id": booking['booking_id'].toString(),
+              "room": booking['room_name'],
+              "room_id": booking['room_id'].toString(),
+              "description": booking['description'] ?? '',
+              "capacity": booking['capacity'].toString(),
+              "status": booking['status'],
+              "reservedBy": "You", // Current user
+            };
+          }).toList();
+          _isLoading = false;
+        });
+      } else {
+        // Fallback to local data if server fails
+        _useLocalHistory();
+      }
+    } catch (e) {
+      // If server is not available, use local data
+      _useLocalHistory();
+    }
+  }
+
+  void _useLocalHistory() {
+    final allHistory = RoomPage.getBookingHistory();
+    setState(() {
+      historyList = userRole == "student"
+          ? allHistory.where((h) => h["reservedBy"] == "Student A").toList()
+          : allHistory;
+      _isLoading = false;
+    });
+  }
 
   Color _getStatusColor(String status) {
     if (status == "Approved") return Colors.green;
@@ -107,61 +172,123 @@ class HistoryPage extends StatelessWidget {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: historyList.isEmpty
-            ? const Center(child: Text("No booking history yet"))
-            : ListView.builder(
-                itemCount: historyList.length,
-                itemBuilder: (context, index) {
-                  final item = historyList[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                            color: Colors.black.withOpacity(0.1), blurRadius: 6)
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(item["room"] ?? "-",
-                                    style: const TextStyle(
-                                        color: Colors.blue,
-                                        fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 4),
-                                Text("Date : ${item["date"] ?? "Oct 5, 2025"}"),
-                                Text("Time: ${item["time"]}"),
-                                Text("Reason: ${item["reason"]}"),
-                                if (userRole != "student") ...[
-                                  const SizedBox(height: 4),
-                                  Text("Reserved by: ${item["reservedBy"]}"),
-                                  Text("Approved by: ${item["approvedBy"]}"),
-                                ]
-                              ]),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFFFFA726),
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: historyList.isEmpty
+                  ? const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.history, size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            "No booking history yet",
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: historyList.length,
+                      itemBuilder: (context, index) {
+                        final item = historyList[index];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                              color: _getStatusColor(item["status"] ?? ""),
-                              borderRadius: BorderRadius.circular(8)),
-                          child: Text(item["status"] ?? "",
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 6)
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.meeting_room,
+                                              size: 20,
+                                              color: Color(0xFF3E7BFA)),
+                                          const SizedBox(width: 8),
+                                          Text(item["room"] ?? "-",
+                                              style: const TextStyle(
+                                                  color: Color(0xFF3E7BFA),
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      if (item["description"] != null &&
+                                          item["description"]!.isNotEmpty)
+                                        Text(
+                                            "Description: ${item["description"]}",
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.black87)),
+                                      if (item["capacity"] != null)
+                                        Text(
+                                            "Capacity: ${item["capacity"]} people",
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.black87)),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                          "Booking ID: ${item["booking_id"] ?? "-"}",
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black54)),
+                                      if (item["time"] != null)
+                                        Text("Time: ${item["time"]}",
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.black87)),
+                                      if (item["reason"] != null)
+                                        Text("Reason: ${item["reason"]}",
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.black87)),
+                                      if (userRole != "student") ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                            "Reserved by: ${item["reservedBy"] ?? "-"}",
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.black87)),
+                                      ]
+                                    ]),
+                              ),
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                    color: _getStatusColor(
+                                        item["status"] ?? ""),
+                                    borderRadius: BorderRadius.circular(8)),
+                                child: Text(item["status"] ?? "",
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
               ),
       ),
       bottomNavigationBar: Container(

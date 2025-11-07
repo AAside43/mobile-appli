@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'register_page.dart';
 // ignore: unused_import
 import 'home_page.dart';
@@ -16,6 +18,10 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _studentIdController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
+
+  // Server URL - change this to your server's IP if running on different machine
+  static const String serverUrl = 'http://localhost:3000';
 
   void _togglePasswordVisibility() {
     setState(() {
@@ -23,37 +29,77 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  // ✅ ฟังก์ชัน Login (แก้ตามนี้)
-void _login() {
-  // ถ้ามีการกรอกครบทั้ง 2 ช่อง
-  if (_studentIdController.text.isNotEmpty &&
-      _passwordController.text.isNotEmpty) {
-    // ตรวจสอบว่ารหัสผ่านมี 6 ตัว
-    if (_passwordController.text.length == 6) {
-      // ไปหน้า HomePage
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
-    } else {
-      // ถ้ารหัสผ่านไม่ครบ 6 ตัว ให้แจ้งเตือน
+  // Updated login function to connect to mobi_app database via server
+  Future<void> _login() async {
+    if (_studentIdController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Password must be exactly 6 characters."),
-          backgroundColor: Colors.orangeAccent,
+          content: Text("Please enter both Student ID and Password."),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('$serverUrl/login'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'username': _studentIdController.text,
+          'password': _passwordController.text,
+        }),
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          // Login successful - navigate to home page
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomePage()),
+          );
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Welcome! ${data['message']}"),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        // Login failed
+        final errorData = json.decode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorData['error'] ?? 'Login failed'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Connection error: Please make sure the server is running on $serverUrl"),
+          backgroundColor: Colors.redAccent,
         ),
       );
     }
-  } else {
-    // ถ้ายังไม่กรอกช่องใดช่องหนึ่ง ให้แจ้งเตือน
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Please enter both Student ID and Password."),
-        backgroundColor: Colors.redAccent,
-      ),
-    );
   }
-}
 
 
   @override
@@ -161,7 +207,7 @@ void _login() {
                 SizedBox(
                   width: 180, // 👈 ขนาดเดิม
                   child: ElevatedButton(
-                    onPressed: _login, // ✅ ใช้ฟังก์ชันใหม่ที่แก้ไว้ด้านบน
+                    onPressed: _isLoading ? null : _login, // Disable button when loading
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFA726),
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -169,14 +215,23 @@ void _login() {
                         borderRadius: BorderRadius.circular(30),
                       ),
                     ),
-                    child: const Text(
-                      "LOGIN",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            "LOGIN",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 20),
