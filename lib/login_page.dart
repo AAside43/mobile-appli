@@ -5,6 +5,7 @@ import 'register_page.dart';
 // ignore: unused_import
 import 'home_page.dart';
 import '้home_page.dart';
+import 'user_session.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -20,8 +21,9 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _isLoading = false;
 
-  // Server URL - change this to your server's IP if running on different machine
-  static const String serverUrl = 'http://localhost:3000';
+  // Server URL - use 10.0.2.2 for Android emulator (maps to host's localhost)
+  // For physical device, use your computer's IP address (e.g., 192.168.1.x:3000)
+  static const String serverUrl = 'http://192.168.57.1:3000';
 
   void _togglePasswordVisibility() {
     setState(() {
@@ -64,6 +66,13 @@ class _LoginPageState extends State<LoginPage> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
+          // Save user session
+          UserSession.setUser(
+            data['userId'],
+            _studentIdController.text,
+            data['role'] ?? 'student',
+          );
+          
           // Login successful - navigate to home page
           Navigator.pushReplacement(
             context,
@@ -72,7 +81,7 @@ class _LoginPageState extends State<LoginPage> {
           
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text("Welcome! ${data['message']}"),
+              content: Text("Welcome ${data['role']}! ${data['message']}"),
               backgroundColor: Colors.green,
             ),
           );

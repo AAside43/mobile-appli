@@ -7,6 +7,7 @@ import 'room_page.dart';
 import 'checkrequest_page.dart';
 import '้home_page.dart';
 import 'login_page.dart';
+import 'user_session.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({Key? key}) : super(key: key);
@@ -16,12 +17,12 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  // Server URL
-  static const String serverUrl = 'http://localhost:3000';
+  // Server URL - use 10.0.2.2 for Android emulator
+  static const String serverUrl = 'http://192.168.57.1:3000';
   
-  // ✅ จำลองบทบาท (student / staff / lecturer)
-  final String userRole = "student";
-  final int userId = 1; // Default user ID - should come from login
+  // ✅ Use actual user from session
+  String get userRole => UserSession.role ?? 'student';
+  int get userId => UserSession.userId ?? 1;
   
   List<Map<String, dynamic>> historyList = [];
   bool _isLoading = true;
@@ -78,9 +79,9 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Color _getStatusColor(String status) {
-    if (status == "Approved") return Colors.green;
-    if (status == "Rejected") return Colors.red;
-    if (status == "Pending") return Colors.amber;
+    if (status == "Approved" || status == "confirmed") return Colors.green;
+    if (status == "Rejected" || status == "cancelled") return Colors.red;
+    if (status == "Pending" || status == "pending") return Colors.amber;
     return Colors.grey;
   }
 

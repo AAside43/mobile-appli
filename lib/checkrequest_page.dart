@@ -7,6 +7,7 @@ import 'room_page.dart';
 import 'history_page.dart';
 import '้home_page.dart';
 import 'login_page.dart';
+import 'user_session.dart';
 
 class CheckRequestPage extends StatefulWidget {
   const CheckRequestPage({Key? key}) : super(key: key);
@@ -16,12 +17,12 @@ class CheckRequestPage extends StatefulWidget {
 }
 
 class _CheckRequestPageState extends State<CheckRequestPage> {
-  // Server URL
-  static const String serverUrl = 'http://localhost:3000';
+  // Server URL - use 10.0.2.2 for Android emulator
+  static const String serverUrl = 'http://192.168.57.1:3000';
   
-  // ✅ จำลองบทบาท (จะมาจาก Login จริงในอนาคต)
-  final String userRole = "student"; // เปลี่ยนเป็น "staff" หรือ "lecturer" ได้
-  final int userId = 1; // Default user ID - should come from login
+  // ✅ Use actual user from session
+  String get userRole => UserSession.role ?? 'student';
+  int get userId => UserSession.userId ?? 1;
   
   List<Map<String, dynamic>> requestList = [];
   bool _isLoading = true;
@@ -34,9 +35,18 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
 
   // Load booking requests from server
   Future<void> _loadBookingRequests() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
     try {
       final response = await http.get(
         Uri.parse('$serverUrl/user/$userId/bookings'),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Connection timeout');
+        },
       );
       
       if (response.statusCode == 200) {
@@ -46,22 +56,24 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
         setState(() {
           requestList = bookingsData.map((booking) {
             return {
-              "booking_id": booking['booking_id'].toString(),
-              "room": booking['room_name'],
-              "room_id": booking['room_id'].toString(),
-              "description": booking['description'] ?? '',
-              "capacity": booking['capacity'].toString(),
-              "status": booking['status'],
+              "booking_id": booking['booking_id']?.toString() ?? "",
+              "room": booking['room_name']?.toString() ?? "Unknown Room",
+              "room_id": booking['room_id']?.toString() ?? "",
+              "description": booking['description']?.toString() ?? '',
+              "capacity": booking['capacity']?.toString() ?? '0',
+              "status": booking['status']?.toString() ?? 'unknown',
               "reservedBy": "You", // Current user
             };
           }).toList();
           _isLoading = false;
         });
       } else {
+        print('Server returned status: ${response.statusCode}');
         // Fallback to local data if server fails
         _useLocalRequests();
       }
     } catch (e) {
+      print('Error loading booking requests: $e');
       // If server is not available, use local data
       _useLocalRequests();
     }
@@ -75,6 +87,109 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
           : allRequests;
       _isLoading = false;
     });
+  }
+
+  // Cancel booking
+  Future<void> _cancelBooking(String bookingId) async {
+    // Validate booking ID
+    if (bookingId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('❌ Invalid booking ID'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    try {
+      print('Attempting to cancel booking: $bookingId');
+      print('Server URL: $serverUrl/booking/$bookingId');
+      
+      final response = await http.delete(
+        Uri.parse('$serverUrl/booking/$bookingId'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Connection timeout - Server not responding');
+        },
+      );
+      
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Booking cancelled successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Reload booking requests
+        await _loadBookingRequests();
+      } else {
+        if (!mounted) return;
+        // Show more detailed error message
+        final errorMsg = response.statusCode == 404 
+            ? 'Booking not found' 
+            : 'Failed to cancel (Status: ${response.statusCode})';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ $errorMsg'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error canceling booking: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  // Show cancel confirmation dialog
+  void _showCancelDialog(String bookingId, String roomName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Row(
+            children: [
+              Icon(Icons.cancel_outlined, color: Colors.red, size: 28),
+              SizedBox(width: 10),
+              Text("Cancel Booking", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+          content: Text(
+            "Are you sure you want to cancel your booking for $roomName?",
+            style: const TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("No", style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _cancelBooking(bookingId);
+              },
+              child: const Text("Yes, Cancel", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override

@@ -9,6 +9,7 @@ import 'checkrequest_page.dart';
 import 'history_page.dart';
 import 'login_page.dart';
 import '้home_page.dart';
+import 'user_session.dart';
 
 class RoomPage extends StatefulWidget {
   const RoomPage({Key? key}) : super(key: key);
@@ -27,11 +28,11 @@ class RoomPage extends StatefulWidget {
 }
 
 class _RoomPageState extends State<RoomPage> {
-  int _selectedIndex = 1;
   bool _isLoading = true;
+  bool _hasActiveBooking = false; // Track if user has active bookings
 
-  // Server URL
-  static const String serverUrl = 'http://localhost:3000';
+  // Server URL - use 10.0.2.2 for Android emulator
+  static const String serverUrl = 'http://192.168.57.1:3000';
 
   // 🧠 ตัวแปรเก็บประวัติการจอง (แชร์ข้ามหน้า)
   static List<Map<String, String>> _bookingHistory = [];
@@ -75,6 +76,7 @@ class _RoomPageState extends State<RoomPage> {
   void initState() {
     super.initState();
     _loadRoomsFromServer();
+    _loadBookingsFromServer();
   }
 
   // Load rooms from server
@@ -96,17 +98,84 @@ class _RoomPageState extends State<RoomPage> {
               "status": ["Free", "Free", "Free", "Free"] // Default to Free for all slots
             };
           }).toList();
-          _isLoading = false;
         });
       } else {
+        // Server returned error
+        print('Failed to load rooms: ${response.statusCode}');
+      }
+    } catch (e) {
+      // If server is not available, use static data
+      print('Error loading rooms: $e');
+    } finally {
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  // Load bookings from server and update room statuses
+  Future<void> _loadBookingsFromServer() async {
+    try {
+      // Get all bookings for current user
+      final userId = UserSession.userId ?? 1;
+      final response = await http.get(
+        Uri.parse('$serverUrl/user/$userId/bookings'),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Connection timeout');
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        List<dynamic> bookingsData = data['bookings'];
+        
+        setState(() {
+          // Reset all room statuses to Free first
+          for (var room in rooms) {
+            room['status'] = ["Free", "Free", "Free", "Free"];
+          }
+          
+          // Check if user has any active bookings (pending or confirmed, NOT cancelled)
+          _hasActiveBooking = bookingsData.any((booking) => 
+            booking['status'] == 'pending' || booking['status'] == 'confirmed'
+          );
+          
+          // Update room statuses based on ACTIVE bookings only
+          for (var booking in bookingsData) {
+            String status = booking['status']?.toString() ?? '';
+            
+            // Skip cancelled bookings
+            if (status == 'cancelled') continue;
+            
+            String roomId = booking['room_id']?.toString() ?? '';
+            
+            // Find matching room and update first available slot
+            for (var room in rooms) {
+              if (room['room_id'] == roomId) {
+                // Update first Free slot with booking status
+                List<String> statusList = List<String>.from(room['status']);
+                for (int i = 0; i < statusList.length; i++) {
+                  if (statusList[i] == "Free") {
+                    statusList[i] = status == 'pending' ? 'Pending' : 'Reserved';
+                    room['status'] = statusList;
+                    break;
+                  }
+                }
+                break;
+              }
+            }
+          }
+        });
+      }
     } catch (e) {
-      // If server is not available, use static data
+      print('Error loading bookings: $e');
+      // Continue without bookings if server unavailable
       setState(() {
-        _isLoading = false;
+        _hasActiveBooking = false;
       });
     }
   }
@@ -126,6 +195,36 @@ class _RoomPageState extends State<RoomPage> {
 
   // ✅ Popup จองห้อง
   void _showBookingDialog(String roomName, String timeSlot) {
+    // Check if user already has an active booking
+    if (_hasActiveBooking) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                SizedBox(width: 10),
+                Text("Cannot Book", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              ],
+            ),
+            content: const Text(
+              "You already have an active booking. Please cancel your existing booking before making a new one.",
+              style: TextStyle(fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK", style: TextStyle(color: Colors.orange)),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+    
     final TextEditingController reasonController = TextEditingController();
     
     // Find room_id from roomName
@@ -170,6 +269,11 @@ class _RoomPageState extends State<RoomPage> {
                 final reason = reasonController.text.trim();
                 Navigator.pop(context);
 
+                // Determine booking status based on user role
+                // Students get 'pending' status, staff/lecturer get 'confirmed'
+                String bookingStatus = UserSession.isStudent ? 'pending' : 'confirmed';
+                String statusDisplay = UserSession.isStudent ? 'Pending' : 'Confirmed';
+
                 // Book room via server if roomId exists
                 if (roomId != null) {
                   try {
@@ -177,18 +281,27 @@ class _RoomPageState extends State<RoomPage> {
                       Uri.parse('$serverUrl/book-room'),
                       headers: {'Content-Type': 'application/json'},
                       body: json.encode({
-                        'userId': 1, // Default user ID - should come from login
+                        'userId': UserSession.userId ?? 1,
                         'roomId': int.parse(roomId),
-                        'status': 'confirmed',
+                        'status': bookingStatus,
                       }),
                     );
 
                     if (response.statusCode == 201) {
                       final data = json.decode(response.body);
+                      
+                      // Reload bookings to update UI
+                      await _loadBookingsFromServer();
+                      
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text("✅ ${data['message']}", textAlign: TextAlign.center),
-                          backgroundColor: Colors.green,
+                          content: Text(
+                            UserSession.isStudent
+                                ? "✅ Booking sent for approval!"
+                                : "✅ ${data['message']}",
+                            textAlign: TextAlign.center,
+                          ),
+                          backgroundColor: UserSession.isStudent ? Colors.amber : Colors.green,
                         ),
                       );
                     }
@@ -202,8 +315,8 @@ class _RoomPageState extends State<RoomPage> {
                     "room": roomName,
                     "time": timeSlot,
                     "reason": reason.isEmpty ? "—" : reason,
-                    "status": "Pending",
-                    "reservedBy": "Student A",
+                    "status": statusDisplay,
+                    "reservedBy": UserSession.username ?? "Student A",
                     "approvedBy": "Lecturer CE",
                   });
 
@@ -212,19 +325,15 @@ class _RoomPageState extends State<RoomPage> {
                       int timeIndex = timeSlots.indexOf(timeSlot);
                       if (timeIndex != -1 &&
                           room["status"][timeIndex] == "Free") {
-                        room["status"][timeIndex] = "Pending";
+                        // Set visual status based on user role
+                        room["status"][timeIndex] = UserSession.isStudent ? "Pending" : "Reserved";
                       }
                       break;
                     }
                   }
                 });
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text("✅ $roomName booked for $timeSlot",
-                        textAlign: TextAlign.center),
-                  ),
-                );
+                // Don't show duplicate snackbar - already shown from API response
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFA726),
@@ -299,6 +408,25 @@ class _RoomPageState extends State<RoomPage> {
         centerTitle: true,
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.blue, size: 26),
+            onPressed: () async {
+              setState(() {
+                _isLoading = true;
+              });
+              await _loadRoomsFromServer();
+              await _loadBookingsFromServer();
+              setState(() {
+                _isLoading = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('✅ Refreshed!'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 26),
             onPressed: () {
               showDialog(
@@ -333,16 +461,48 @@ class _RoomPageState extends State<RoomPage> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 1.5),
-                borderRadius: BorderRadius.circular(10),
-              ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _loadRoomsFromServer();
+          await _loadBookingsFromServer();
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Active booking warning banner
+              if (_hasActiveBooking)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    border: Border.all(color: Colors.orange, width: 1.5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "You have an active booking. Cancel it to book another room.",
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.orange.shade900,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.black, width: 1.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               child: const Row(
                 children: [
                   Icon(Icons.calendar_today_outlined,
@@ -395,14 +555,28 @@ class _RoomPageState extends State<RoomPage> {
                               room["status"].length,
                               (statusIndex) {
                                 String status = room["status"][statusIndex];
+                                bool canBook = status == "Free" && !_hasActiveBooking;
                                 return Expanded(
                                   child: GestureDetector(
-                                    onTap: status == "Free"
+                                    onTap: canBook
                                         ? () => _showBookingDialog(
                                               room["name"],
                                               timeSlots[statusIndex],
                                             )
-                                        : null,
+                                        : status == "Free" && _hasActiveBooking
+                                            ? () {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      '⚠️ You already have an active booking',
+                                                      textAlign: TextAlign.center,
+                                                    ),
+                                                    backgroundColor: Colors.orange,
+                                                    duration: Duration(seconds: 2),
+                                                  ),
+                                                );
+                                              }
+                                            : null,
                                     child: Container(
                                       margin: const EdgeInsets.symmetric(
                                           horizontal: 2),
@@ -433,6 +607,7 @@ class _RoomPageState extends State<RoomPage> {
             ),
           ],
         ),
+      ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

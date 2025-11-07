@@ -22,8 +22,8 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
-  // Server URL - same as login page
-  static const String serverUrl = 'http://localhost:3000';
+  // Server URL - use 10.0.2.2 for Android emulator (maps to host's localhost)
+  static const String serverUrl = 'http://192.168.57.1:3000';
 
   void _togglePasswordVisibility() {
     setState(() {

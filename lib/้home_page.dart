@@ -5,6 +5,7 @@ import 'room_page.dart';
 import 'checkrequest_page.dart';
 import 'history_page.dart';
 import 'login_page.dart';
+import 'user_session.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -14,8 +15,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Server URL
-  static const String serverUrl = 'http://localhost:3000';
+  // Server URL - use 10.0.2.2 for Android emulator
+  static const String serverUrl = 'http://192.168.57.1:3000';
   bool _isLoading = true;
   List<Map<String, dynamic>> rooms = [];
 
@@ -152,6 +153,8 @@ class _HomePageState extends State<HomePage> {
                     ),
                     TextButton(
                       onPressed: () {
+                        // Clear user session
+                        UserSession.clear();
                         Navigator.pop(context); // ปิด popup
                         Navigator.pushAndRemoveUntil(
                           context,
