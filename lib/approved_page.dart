@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
-// Make sure these paths are correct for your project structure
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
 import 'dashboard_page.dart';
 import 'room_page.dart';
 import 'history_page.dart';
+import 'config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'login_page.dart';
 
 class ApprovedPage extends StatefulWidget {
   const ApprovedPage({Key? key}) : super(key: key);
@@ -11,58 +16,59 @@ class ApprovedPage extends StatefulWidget {
   State<ApprovedPage> createState() => _ApprovedPageState();
 }
 
-// Dummy data moved outside the class to be used in initState
-final List<Map<String, String>> _dummyRequests = [
-  {
-    'room': 'Room 1',
-    'capacity': '4',
-    'date': 'Oct 1, 2025',
-    'time': '08:00 - 10:00',
-    // FIX 1: Reverted to Image.asset and using case-sensitive filenames
-    // from your screenshot (e.g., Room1.jpg, not room1.jpg)
-    'image': 'assets/images/Room1.jpg'
-  },
-  {
-    'room': 'Room 2',
-    'capacity': '8',
-    'date': 'Oct 1, 2025',
-    'time': '08:00 - 10:00',
-    'image': 'assets/images/Room2.jpg'
-  },
-  {
-    'room': 'Room 3',
-    'capacity': '16',
-    'date': 'Oct 1, 2025',
-    'time': '08:30 - 10:00',
-    'image': 'assets/images/Room3.jpg'
-  },
-  {
-    'room': 'Room 4',
-    'capacity': '4',
-    'date': 'Oct 1, 2025',
-    'time': '08:00 - 10:00',
-    'image': 'assets/images/Room1.jpg' // Re-using Room1.jpg as in your original code
-  },
-];
-
 class _ApprovedPageState extends State<ApprovedPage> {
-  int selectedIndex = 2; // this page = Check Request Tab
-  late List<Map<String, String>> _requests; // Mutable list for state
+  int selectedIndex = 2;
+  final String baseUrl = apiBaseUrl; 
 
-  @override
-  void initState() {
-    super.initState();
-    // Initialize the mutable list from the dummy data
-    _requests = List.from(_dummyRequests);
+  List<dynamic> _requests = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
+
+  // (ฟังก์ชัน _logout, _fetchPendingRequests, onTabTapped ... ไม่เปลี่ยนแปลง)
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const LoginPage(),
+      ),
+      (route) => false,
+    );
+  }
+
+  Future<void> _fetchPendingRequests() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/bookings/pending'));
+      if (response.statusCode == 200) {
+        setState(() {
+          _requests = json.decode(response.body)['requests'];
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = "Failed to load requests: ${response.statusCode}";
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = "Error connecting to server: $e";
+        _isLoading = false;
+      });
+    }
   }
 
   void onTabTapped(int index) {
-    if (index == selectedIndex) return; // Don't navigate to the same page
-
+    if (index == selectedIndex) return; 
     setState(() {
       selectedIndex = index;
     });
-
     if (index == 0) {
       Navigator.pushReplacement(
           context, MaterialPageRoute(builder: (_) => DashboardPage()));
@@ -70,29 +76,128 @@ class _ApprovedPageState extends State<ApprovedPage> {
       Navigator.pushReplacement(
           context, MaterialPageRoute(builder: (_) => RoomPage()));
     } else if (index == 2) {
-      // CURRENT PAGE: Approved / Check Request page
-      // No navigation needed
+      // CURRENT PAGE
     } else if (index == 3) {
       Navigator.pushReplacement(
           context, MaterialPageRoute(builder: (_) => HistoryPage()));
     }
   }
 
-  // Function to handle processing the request (accept or reject)
-  void _processRequest(int index, String status) {
-    final roomName = _requests[index]['room'];
+  // ❇️ 1. แยกฟังก์ชันการยิง API ออกมา
+  Future<void> _callProcessApi(int index, String apiStatus, String? rejectionReason) async {
+    final request = _requests[index];
+    final bookingId = request['booking_id'];
+    final roomName = request['room_name'];
+    
+    final prefs = await SharedPreferences.getInstance();
+    final int approverId = prefs.getInt('userId') ?? 1;
 
-    setState(() {
-      _requests.removeAt(index);
-    });
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/booking/$bookingId/status'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'status': apiStatus,
+          'approverId': approverId,
+          'rejection_reason': rejectionReason // ❇️ ส่งเหตุผลไปที่นี่
+        }),
+      );
 
-    // Show a snackbar to confirm the action
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$roomName request has been $status.'),
-        backgroundColor: status == 'Accepted' ? Colors.green : Colors.red,
-      ),
+      if (response.statusCode == 200) {
+        setState(() {
+          _requests.removeAt(index);
+        });
+        String action = apiStatus == 'approved' ? 'Accepted' : 'Rejected';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$roomName request has been $action.'),
+            backgroundColor: action == 'Accepted' ? Colors.green : Colors.red,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to process request: ${response.body}'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.grey,
+        ),
+      );
+    }
+  }
+
+  // ❇️ 2. สร้างฟังก์ชันสำหรับ Pop-up
+  Future<void> _showRejectionDialog(int index) async {
+    final TextEditingController reasonController = TextEditingController();
+    
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Reason for Rejection'),
+          content: TextField(
+            controller: reasonController,
+            decoration: const InputDecoration(hintText: "Enter reason here..."),
+            autofocus: true,
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton(
+              child: const Text('Submit Reject'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () {
+                final reason = reasonController.text.trim();
+                if (reason.isEmpty) {
+                  // (Optional) แสดง Error ถ้าไม่ใส่เหตุผล
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a reason.'), backgroundColor: Colors.orange),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop(); // ปิด Pop-up
+                // เรียก API
+                _callProcessApi(index, 'rejected', reason);
+              },
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  // ❇️ 3. แก้ไขฟังก์ชัน _processRequest เดิม
+  void _processRequest(int index, String action) {
+    if (action == 'Accepted') {
+      // ถ้า Accept, ยิง API เลย (ส่ง reason เป็น null)
+      _callProcessApi(index, 'approved', null);
+    } else {
+      // ถ้า Reject, ให้เปิด Pop-up ก่อน
+      _showRejectionDialog(index);
+    }
+  }
+
+  // (ฟังก์ชัน _getRoomImage, build, _buildRequestCard, _actionButton ... ไม่เปลี่ยนแปลง)
+  String _getRoomImage(String roomName) {
+    String lowerRoomName = roomName.toLowerCase();
+    if (lowerRoomName.contains('room 1')) return 'assets/images/Room1.jpg';
+    if (lowerRoomName.contains('room 2')) return 'assets/images/Room2.jpg';
+    if (lowerRoomName.contains('room 3')) return 'assets/images/Room3.jpg';
+    if (lowerRoomName.contains('room 4')) return 'assets/images/Room4.jpg';
+    if (lowerRoomName.contains('study room')) return 'assets/images/Room1.jpg'; 
+    if (lowerRoomName.contains('meeting room')) return 'assets/images/Room2.jpg';
+    if (lowerRoomName.contains('entertaining space')) return 'assets/images/Room3.jpg';
+    return 'assets/images/Room1.jpg';
   }
 
   @override
@@ -113,36 +218,64 @@ class _ApprovedPageState extends State<ApprovedPage> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(
+              Icons.logout_rounded,
+              color: Colors.red,
+              size: 26,
+            ),
             onPressed: () {
-              // Example of how to refresh the list
-              setState(() {
-                _requests = List.from(_dummyRequests);
-              });
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Logout"),
+                  content: const Text("Are you sure you want to log out?"),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Cancel"),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _logout();
+                      },
+                      child: const Text("Logout",
+                          style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
             },
-            icon: const Icon(Icons.refresh, color: Colors.black),
           ),
         ],
       ),
-      body: _requests.isEmpty
-          ? const Center(
-              child: Text(
-                'No pending requests.',
-                style: TextStyle(fontSize: 18, color: Colors.grey),
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: _requests.length,
-              itemBuilder: (context, index) {
-                return _buildRequestCard(
-                  _requests[index],
-                  () => _processRequest(index, 'Accepted'),
-                  () => _processRequest(index, 'Rejected'),
-                );
-              },
-            ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage.isNotEmpty
+              ? Center(
+                  child:
+                      Text(_errorMessage, style: TextStyle(color: Colors.red)))
+              : _requests.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No pending requests.',
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: _requests.length,
+                      itemBuilder: (context, index) {
+                        return _buildRequestCard(
+                          _requests[index],
+                          // ❇️ 4. แก้ไขการส่งฟังก์ชัน
+                          () => _processRequest(index, 'Accepted'),
+                          () => _processRequest(index, 'Rejected'),
+                        );
+                      },
+                    ),
 
-      /// ✅ Bottom Navigation Bar
+      /// Bottom Navigation Bar
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -170,7 +303,7 @@ class _ApprovedPageState extends State<ApprovedPage> {
               icon: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: const BoxDecoration(
-                  color: Color(0xFFFFA726), // Orange color for active tab
+                  color: Color(0xFFFFA726),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.checklist_rtl, color: Colors.white),
@@ -186,10 +319,17 @@ class _ApprovedPageState extends State<ApprovedPage> {
   }
 
   Widget _buildRequestCard(
-    Map<String, String> data,
+    Map<String, dynamic> data,
     VoidCallback onAccept,
     VoidCallback onReject,
   ) {
+    final String roomName = data['room_name'] ?? 'Room';
+    final String capacity = data['capacity']?.toString() ?? 'N/A';
+    final String date = data['date'] ?? 'N/A';
+    final String time = data['time_slot'] ?? 'N/A';
+    final String studentName = data['student_name'] ?? 'Student';
+    final String reason = data['reason'] ?? 'N/A';
+
     return Card(
       elevation: 3,
       margin: const EdgeInsets.only(bottom: 15),
@@ -201,18 +341,17 @@ class _ApprovedPageState extends State<ApprovedPage> {
               topLeft: Radius.circular(12),
               bottomLeft: Radius.circular(12),
             ),
-            // FIX 1: Changed back to Image.asset
             child: Image.asset(
-              data['image']!,
+              _getRoomImage(roomName),
               width: 120,
-              height: 110,
+              height: 130, 
               fit: BoxFit.cover,
-              // Add an error builder for robustness
               errorBuilder: (context, error, stackTrace) => Container(
                 width: 120,
-                height: 110,
+                height: 130,
                 color: Colors.grey[200],
-                child: const Icon(Icons.broken_image, color: Colors.grey),
+                child: Icon(Icons.image_not_supported_rounded,
+                    color: Colors.grey[400], size: 40),
               ),
             ),
           ),
@@ -222,14 +361,15 @@ class _ApprovedPageState extends State<ApprovedPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(data['room']!,
+                  Text(roomName,
                       style: const TextStyle(
                           fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text("Capacity : ${data['capacity']} people"),
-                  Text("Date : ${data['date']}"),
-                  Text("Time : ${data['time']}"),
+                  Text("Capacity : $capacity people"),
+                  Text("Date : $date"),
+                  Text("Time : $time"),
+                  Text("Request by: $studentName"),
+                  Text("Reason : $reason"),
                   const SizedBox(height: 6),
-                  // FIX 2: Wrapped buttons in Expanded to prevent overflow
                   Row(
                     children: [
                       Expanded(
@@ -244,7 +384,7 @@ class _ApprovedPageState extends State<ApprovedPage> {
                         child: _actionButton(
                           "Reject",
                           Colors.red,
-                          onReject,
+                          onReject, // ❇️ ฟังก์ชันนี้จะไปเปิด Pop-up
                         ),
                       ),
                     ],
@@ -258,7 +398,6 @@ class _ApprovedPageState extends State<ApprovedPage> {
     );
   }
 
-  // Changed this to an ElevatedButton for better layout control and click handling
   Widget _actionButton(String text, Color color, VoidCallback onPressed) {
     return SizedBox(
       height: 32,
@@ -270,14 +409,11 @@ class _ApprovedPageState extends State<ApprovedPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20.0),
           ),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
           textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
         ),
-        // Ensures text doesn't wrap and fits
         child: Text(text, overflow: TextOverflow.ellipsis, maxLines: 1),
       ),
     );
   }
 }
-
