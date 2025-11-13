@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'config.dart';
+
 import 'register_page.dart';
 import 'dashboard_page.dart';
 
@@ -15,30 +20,82 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  // ❇️ 2. เพิ่มตัวแปรสำหรับ API
+  bool _isLoading = false;
+  final String baseUrl = apiBaseUrl; // centralized in lib/config.dart
+
   void _togglePasswordVisibility() {
     setState(() {
       _obscurePassword = !_obscurePassword;
     });
   }
 
-  // ✅ ฟังก์ชัน Login (แก้ตรงนี้)
-  void _login() {
-    // ถ้ามีการกรอกครบทั้ง 2 ช่อง
-    if (_studentIdController.text.isNotEmpty &&
-        _passwordController.text.isNotEmpty) {
-      // ไปหน้า HomePage
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const DashboardPage()),
-      );
-    } else {
-      // ถ้ายังไม่กรอกช่องใดช่องหนึ่ง ให้แจ้งเตือน
+  // ❇️ 3. แก้ไขฟังก์ชัน Login ทั้งหมด
+  Future<void> _login() async {
+    if (_studentIdController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Please enter both Student ID and Password."),
+          content: Text("Please enter both User ID and Password."),
           backgroundColor: Colors.redAccent,
         ),
       );
+      return;
+    }
+
+    // เริ่มโหลด
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'username': _studentIdController.text,
+          'password': _passwordController.text,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // --- ล็อกอินสำเร็จ ---
+        final data = json.decode(response.body);
+
+        // ❇️ 4. บันทึกข้อมูลผู้ใช้ลงใน SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('userId', data['userId']);
+        await prefs.setString('role', data['role']);
+        await prefs.setBool('isLoggedIn', true);
+
+        // ❇️ 5. ไปหน้า Dashboard
+        // (เราจะส่ง role ไปด้วยเผื่อ Dashboard ต้องใช้ในอนาคต)
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardPage()),
+        );
+      } else {
+        // --- ล็อกอินไม่สำเร็จ (เช่น รหัสผิด, username ผิด) ---
+        final data = json.decode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(data['error'] ?? 'Login failed. Please try again.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      // --- เกิดข้อผิดพลาดในการเชื่อมต่อ ---
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error connecting to server: $e'),
+          backgroundColor: Colors.grey,
+        ),
+      );
+    } finally {
+      // หยุดโหลด
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -53,6 +110,7 @@ class _LoginPageState extends State<LoginPage> {
             key: _formKey,
             child: Column(
               children: [
+                // (... โค้ดส่วน Image และ Title เหมือนเดิม ...)
                 const SizedBox(height: 40),
 
                 // ===== IMAGE =====
@@ -84,6 +142,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 40),
 
+                // ( ... โค้ดส่วน User ID และ Password เหมือนเดิม ...)
                 // ===== USER ID =====
                 Container(
                   decoration: BoxDecoration(
@@ -145,9 +204,10 @@ class _LoginPageState extends State<LoginPage> {
 
                 // ===== LOGIN BUTTON =====
                 SizedBox(
-                  width: 180, // 👈 ขนาดเดิม
+                  width: 180,
                   child: ElevatedButton(
-                    onPressed: _login, // ✅ ใช้ฟังก์ชันใหม่ที่แก้ไว้ด้านบน
+                    onPressed:
+                        _isLoading ? null : _login, // ❇️ 6. ปิดปุ่มขณะโหลด
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFA726),
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -155,18 +215,29 @@ class _LoginPageState extends State<LoginPage> {
                         borderRadius: BorderRadius.circular(30),
                       ),
                     ),
-                    child: const Text(
-                      "LOGIN",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    // ❇️ 7. แสดงตัวหมุนขณะโหลด
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            "LOGIN",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 20),
 
+                // ( ... โค้ดส่วน Divider และ Register link เหมือนเดิม ...)
                 // ===== OR DIVIDER =====
                 Row(
                   children: const [
