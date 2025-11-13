@@ -1,92 +1,157 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_appli_1/dashboard_page.dart';
-import 'room_page.dart';
-import 'approved_page.dart';
-import 'login_page.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-class HistoryPage extends StatelessWidget {
-  // ✅ เพิ่มพารามิเตอร์รับข้อมูลจาก RoomPage
-  final List<Map<String, String>>? history;
-  const HistoryPage({super.key, this.history});
+import 'package:mobile_appli_1/dashboard_page.dart';
+import 'package:mobile_appli_1/room_page.dart'; // ❇️ (สำหรับ Student)
+import 'package:mobile_appli_1/approved_page.dart'; // ❇️ (สำหรับ Lecturer)
+import 'package:mobile_appli_1/login_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'config.dart';
+// ❇️ (ลบ config.dart ที่ซ้ำออก)
+
+class HistoryPage extends StatefulWidget {
+  const HistoryPage({super.key});
+
+  @override
+  State<HistoryPage> createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+  // ❇️ (Lecturer: 3, Student: 2)
+  // เราจะตั้งค่า selectedIndex หลังจากรู้ Role แล้ว
+  int selectedIndex = 0;
+  final String baseUrl = apiBaseUrl;
+
+  List<dynamic> _historyList = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
+
+  String? _userRole;
+  int? _userId;
+  bool _isLecturerOrStaff = false; // ตัวแปรคุม UI
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserDataAndFetchHistory();
+  }
+
+  Future<void> _loadUserDataAndFetchHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // ดึงข้อมูล User และตั้งค่า State
+    _userId = prefs.getInt('userId');
+    _userRole = prefs.getString('role');
+    _isLecturerOrStaff = (_userRole == 'lecturer' || _userRole == 'staff');
+
+    setState(() {
+      // ❇️ ตั้งค่า selectedIndex ตาม Role
+      selectedIndex = _isLecturerOrStaff ? 3 : 2;
+    });
+
+    _fetchHistory(); // เรียกฟังก์ชันดึงข้อมูล
+  }
+
+  Future<void> _fetchHistory() async {
+    // ❇️ ป้องกัน Error ถ้าหา Role ไม่เจอ
+    if (_userId == null || _userRole == null) {
+      setState(() {
+        _errorMessage = "User data not found. Please re-login.";
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // --- ❇️ ตรรกะสำคัญ: เปลี่ยน API URL ตาม Role ---
+    String apiUrl;
+    if (_isLecturerOrStaff) {
+      // ถ้าเป็น Lecturer/Staff, ดึงประวัติทั้งหมด (จาก API ใหม่)
+      apiUrl = '$baseUrl/bookings/history';
+    } else {
+      // ถ้าเป็น Student, ดึงเฉพาะของตัวเอง (API เดิม)
+      apiUrl = '$baseUrl/user/$_userId/bookings';
+    }
+    // --- สิ้นสุดตรรกะ ---
+
+    try {
+      final response = await http.get(Uri.parse(apiUrl));
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _historyList = json.decode(response.body)['bookings'];
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = "Failed to load history: ${response.statusCode}";
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = "Error connecting to server: $e";
+        _isLoading = false;
+      });
+    }
+  }
 
   Color _getStatusColor(String status) {
     if (status == "Approved") return Colors.green;
     if (status == "Rejected") return Colors.red;
     if (status == "Pending") return Colors.orange;
+    if (status == "Cancelled") return Colors.blueGrey;
     return Colors.grey;
+  }
+
+  void onTabTapped(int index) {
+    // ❇️ (Lecturer: 3, Student: 2)
+    final int currentIndex = _isLecturerOrStaff ? 3 : 2;
+    if (index == currentIndex) return;
+
+    // สำหรับ Lecturer/Staff (มี 4 ปุ่ม)
+    if (_isLecturerOrStaff) {
+      if (index == 0) {
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => const DashboardPage()));
+      } else if (index == 1) {
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => const RoomPage()));
+      } else if (index == 2) {
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => const ApprovedPage()));
+      }
+    }
+    // สำหรับ Student (มี 3 ปุ่ม)
+    else {
+      if (index == 0) {
+        // (สมมติว่าหน้าหลัก Student คือ HomePage)
+        // Navigator.pushReplacement(
+        //     context, MaterialPageRoute(builder: (_) => const HomePage()));
+      } else if (index == 1) {
+        // (สมมติว่าหน้าจองของ Student คือ RoomPage)
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => const RoomPage()));
+      }
+    }
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear(); // ล้างข้อมูลล็อกอิน
+
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const LoginPage(),
+      ),
+      (route) => false,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    int selectedIndex = 3;
-
-    void onTabTapped(int index) {
-      if (index == 0) {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => DashboardPage()));
-      } else if (index == 1) {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => RoomPage()));
-      } else if (index == 2) {
-        Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => ApprovedPage()));
-      }
-    }
-
-    // ✅ ถ้ามี history จาก RoomPage ให้ใช้ข้อมูลจริง
-    final List<Map<String, dynamic>> historyList = history != null && history!.isNotEmpty
-        ? history!
-            .map((item) => {
-                  "room": item["room"],
-                  "capacity": "-",
-                  "date": "Oct 5, 2025",
-                  "time": item["time"],
-                  "reserved": "Student A",
-                  "approved": "Lecturer CE",
-                  "reason": item["reason"],
-                  "status": item["status"] ?? "Pending",
-                })
-            .toList()
-        : [
-            // ✅ ข้อมูลตัวอย่างเดิมของคุณ (fallback)
-            {
-              "room": "ROOM 1",
-              "capacity": "4 People",
-              "date": "Oct 5, 2025",
-              "time": "08:00 - 10:00",
-              "reserved": "Student A",
-              "approved": "Lecturer A",
-              "status": "Approved"
-            },
-            {
-              "room": "ROOM 2",
-              "capacity": "8 People",
-              "date": "Oct 5, 2025",
-              "time": "10:00 - 12:00",
-              "reserved": "Student B",
-              "approved": "Lecturer A",
-              "status": "Approved"
-            },
-            {
-              "room": "ROOM 3",
-              "capacity": "16 People",
-              "date": "Oct 5, 2025",
-              "time": "13:00 - 15:00",
-              "reserved": "Student C",
-              "approved": "Lecturer A",
-              "status": "Rejected"
-            },
-            {
-              "room": "ROOM 4",
-              "capacity": "16 People",
-              "date": "Oct 5, 2025",
-              "time": "15:00 - 17:00",
-              "reserved": "Student D",
-              "approved": "Lecturer A",
-              "status": "Rejected"
-            },
-          ];
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -122,13 +187,7 @@ class HistoryPage extends StatelessWidget {
                     TextButton(
                       onPressed: () {
                         Navigator.pop(context);
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginPage(),
-                          ),
-                          (route) => false,
-                        );
+                        _logout(); // ❇️ เรียกใช้ฟังก์ชัน Logout
                       },
                       child: const Text(
                         "Logout",
@@ -144,80 +203,112 @@ class HistoryPage extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: historyList.isEmpty
-            ? const Center(
-                child: Text(
-                  "No booking history yet",
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-              )
-            : ListView.builder(
-                itemCount: historyList.length,
-                itemBuilder: (context, index) {
-                  final item = historyList[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage.isNotEmpty
+                ? Center(
+                    child: Text(_errorMessage,
+                        style: TextStyle(color: Colors.red)))
+                : _historyList.isEmpty
+                    ? Center(
+                        child: Text(
+                          _isLecturerOrStaff
+                              ? "No approved/rejected history yet"
+                              : "No booking history yet",
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item["room"],
-                                style: const TextStyle(
-                                  color: Color(0xFF3E7BFA),
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(item["capacity"]),
-                              const SizedBox(height: 4),
-                              Text("Date : ${item["date"]}"),
-                              Text("Time : ${item["time"]}"),
-                              if (item["reason"] != null)
-                                Text("Reason : ${item["reason"]}"),
-                              Text("Reserved by : ${item["reserved"]}"),
-                              Text("Approved by : ${item["approved"]}"),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _getStatusColor(item["status"]),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            item["status"],
-                            style: const TextStyle(
+                      )
+                    : ListView.builder(
+                        itemCount: _historyList.length,
+                        itemBuilder: (context, index) {
+                          final item = _historyList[index];
+
+                          // ❇️ ดึงเหตุผลการปฏิเสธออกมา
+                          final String? rejectionReason =
+                              item["rejection_reason"];
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
                               color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item["room"],
+                                        style: const TextStyle(
+                                          color: Color(0xFF3E7BFA),
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(item["capacity"]),
+                                      const SizedBox(height: 4),
+                                      Text("Date : ${item["date"]}"),
+                                      Text("Time : ${item["time"]}"),
+                                      Text(
+                                          "Reason : ${item["reason"] ?? 'N/A'}"),
+                                      Text("Reserved by : ${item["reserved"]}"),
+                                      Text("Approved by : ${item["approved"]}"),
+
+                                      // ❇️ นี่คือ Widget ที่เพิ่มเข้ามา ❇️
+                                      // (แสดงผลเฉพาะถ้า Status = Rejected และมีเหตุผล)
+                                      if (item["status"] == "Rejected" &&
+                                          rejectionReason != null &&
+                                          rejectionReason.isNotEmpty)
+                                        Padding(
+                                          padding:
+                                              const EdgeInsets.only(top: 4.0),
+                                          child: Text(
+                                            "Reject Reason: $rejectionReason",
+                                            style: TextStyle(
+                                              color: Colors.red[700],
+                                              fontWeight: FontWeight.bold,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: _getStatusColor(item["status"]),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    item["status"],
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
       ),
 
-      // ✅ bottom nav (คงเดิม)
+      // ❇️ BottomNavigationBar แบบไดนามิก ❇️
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -236,31 +327,57 @@ class HistoryPage extends StatelessWidget {
           unselectedItemColor: Colors.black54,
           showUnselectedLabels: true,
           onTap: onTabTapped,
-          items: [
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.home_filled),
-              label: "Home",
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.meeting_room_outlined),
-              label: "Room",
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.checklist_rtl),
-              label: "Check Request",
-            ),
-            BottomNavigationBarItem(
-              icon: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFFA726),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.history, color: Colors.white),
-              ),
-              label: "History",
-            ),
-          ],
+          // ❇️ สร้างรายการปุ่ม (items) แบบไดนามิก
+          items: _isLecturerOrStaff
+              // --- ถ้าเป็น Lecturer (4 ปุ่ม) ---
+              ? [
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.home_filled),
+                    label: "Home",
+                  ),
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.meeting_room_outlined),
+                    label: "Room",
+                  ),
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.checklist_rtl),
+                    label: "Check Request",
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        // ❇️ แก้ไขโค้ดสีที่ผิด (0xFFFFA726)
+                        color: Color(0xFFFFA726),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.history, color: Colors.white),
+                    ),
+                    label: "History",
+                  ),
+                ]
+              // --- ถ้าเป็น Student (3 ปุ่ม) ---
+              : [
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.home_filled),
+                    label: "Home",
+                  ),
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.meeting_room_outlined),
+                    label: "Room",
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFA726),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.history, color: Colors.white),
+                    ),
+                    label: "History",
+                  ),
+                ],
         ),
       ),
     );
