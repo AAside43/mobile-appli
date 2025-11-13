@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'login_page.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'config.dart'; 
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({Key? key}) : super(key: key);
@@ -10,14 +13,21 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
+  // ❇️ 3. แก้ไข Controller ให้ตรงกับ API
+  // API ('/register') ต้องการ 'username' และ 'password'
+  // 'Student ID' ไม่ได้ใช้ใน API แต่เราจะใช้ 'username' แทน
   final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _studentIdController = TextEditingController();
+  // final TextEditingController _studentIdController = TextEditingController(); // (ไม่จำเป็นสำหรับ API)
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+
+  // ❇️ 4. เพิ่มตัวแปรสำหรับ API
+  bool _isLoading = false;
+  final String baseUrl = apiBaseUrl;
 
   void _togglePasswordVisibility() {
     setState(() {
@@ -31,15 +41,61 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
-  void _register() {
-    if (_formKey.currentState!.validate()) {
+  // ❇️ 5. แก้ไขฟังก์ชัน _register ทั้งหมด
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) {
+      return; // ถ้าฟอร์มไม่ผ่าน ก็ไม่ต้องทำอะไรต่อ
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          // API ต้องการ 'username'
+          'username': _usernameController.text,
+          'password': _passwordController.text,
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        // --- ลงทะเบียนสำเร็จ ---
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Register successful! Please login."),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
+      } else {
+        // --- ลงทะเบียนไม่สำเร็จ (เช่น username ซ้ำ) ---
+        final data = json.decode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(data['error'] ?? 'Register failed.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      // --- เกิดข้อผิดพลาดในการเชื่อมต่อ ---
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Register successful!")),
+        SnackBar(
+          content: Text('Error connecting to server: $e'),
+          backgroundColor: Colors.grey,
+        ),
       );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -48,7 +104,7 @@ class _RegisterPageState extends State<RegisterPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // 🔹 พื้นหลังครึ่งบนสีฟ้า ครึ่งล่างสีขาว
+          // ... (UI ส่วนบนเหมือนเดิม) ...
           Column(
             children: [
               Expanded(
@@ -71,6 +127,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // ... (ปุ่ม Back, Title เหมือนเดิม) ...
                     IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new, size: 20),
                       onPressed: () => Navigator.pop(context),
@@ -105,7 +162,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Username
+                            // ... (Username) ...
                             const Text(
                               "Username *",
                               style: TextStyle(
@@ -143,45 +200,10 @@ class _RegisterPageState extends State<RegisterPage> {
                             ),
                             const SizedBox(height: 18),
 
-                            // Student ID
-                            const Text(
-                              "Student ID *",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF3F5F9),
-                                borderRadius: BorderRadius.circular(30),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black12.withOpacity(0.1),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: TextFormField(
-                                controller: _studentIdController,
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(
-                                      vertical: 16, horizontal: 16),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter your Student ID';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 18),
+                            // ❇️ (ลบ Student ID ที่ไม่จำเป็นสำหรับ API ออก)
+                            // หรือคุณจะเก็บไว้ก็ได้ แต่มันจะไม่ถูกส่งไปที่เซิร์ฟเวอร์
 
-                            // Password
+                            // ... (Password) ...
                             const Text(
                               "Password *",
                               style: TextStyle(
@@ -232,7 +254,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             ),
                             const SizedBox(height: 18),
 
-                            // Confirm Password
+                            // ... (Confirm Password) ...
                             const Text(
                               "Confirm Password *",
                               style: TextStyle(
@@ -280,13 +302,13 @@ class _RegisterPageState extends State<RegisterPage> {
                             ),
                             const SizedBox(height: 30),
 
-                            // ปุ่ม Register แบบเล็กรีดแนวนอน
+                            // ❇️ 6. แก้ไขปุ่ม Register
                             Center(
                               child: SizedBox(
                                 width: 180,
                                 height: 42,
                                 child: ElevatedButton(
-                                  onPressed: _register,
+                                  onPressed: _isLoading ? null : _register,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFFFFA726),
                                     shape: RoundedRectangleBorder(
@@ -295,21 +317,30 @@ class _RegisterPageState extends State<RegisterPage> {
                                     elevation: 4,
                                     shadowColor: Colors.black26,
                                   ),
-                                  child: const Text(
-                                    "REGISTER",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text(
+                                          "REGISTER",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
                                 ),
                               ),
                             ),
                             const SizedBox(height: 20),
 
-                            // ข้อความแยกบรรทัด (ให้อยู่ตรงกลาง)
+                            // ... (Login link) ...
                             Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
