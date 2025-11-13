@@ -1,147 +1,110 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart'; // ❇️ 1. เพิ่ม import
+
 import 'dashboard_page.dart';
 import 'approved_page.dart';
 import 'history_page.dart';
 import 'login_page.dart';
-
+import 'config.dart';
 
 class RoomPage extends StatefulWidget {
-  const RoomPage({super.key});
+  final String? filterStatus;
+
+  const RoomPage({Key? key, this.filterStatus}) : super(key: key);
 
   @override
   State<RoomPage> createState() => _RoomPageState();
 }
 
 class _RoomPageState extends State<RoomPage> {
-  // ignore: unused_field
-  final int _selectedIndex = 1;
+  // ❇️ 2. กำหนด Base URL และตัวแปร State
+  final String baseUrl = apiBaseUrl; // centralized in lib/config.dart
+  List<dynamic> _rooms = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
+  String? _activeFilter;
 
-  // 🧠 ตัวแปรเก็บประวัติการจอง
-  static final List<Map<String, String>> _bookingHistory = [];
+  // ❇️ 3. ลบตัวแปร static ทั้งหมด (rooms, _bookingHistory, timeSlots)
 
-  final List<String> timeSlots = [
-    '08:00-10:00',
-    '10:00-12:00',
-    '13:00-15:00',
-    '15:00-17:00',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // set active filter from widget
+    _activeFilter = widget.filterStatus;
+    // ❇️ 4. เรียกฟังก์ชันใหม่เพื่อดึงข้อมูลสถานะห้องทั้งหมด
+    _fetchRoomSlots();
+  }
 
-  final List<Map<String, dynamic>> rooms = [
-    {
-      "name": "Room 1",
-      "status": ["Free", "Reserved", "Pending", "Disabled"]
-    },
-    {
-      "name": "Room 2",
-      "status": ["Free", "Free", "Pending", "Disabled"]
-    },
-    {
-      "name": "Room 3",
-      "status": ["Disabled", "Disabled", "Disabled", "Disabled"]
-    },
-    {
-      "name": "Room 4",
-      "status": ["Free", "Pending", "Free", "Free"]
-    },
-    {
-      "name": "Room 5",
-      "status": ["Pending", "Free", "Reserved", "Free"]
-    },
-    {
-      "name": "Room 6",
-      "status": ["Free", "Free", "Free", "Pending"]
-    },
-  ];
+  // ❇️ 5. สร้างฟังก์ชันใหม่สำหรับเรียก GET /rooms/slots
+  Future<void> _fetchRoomSlots() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
 
-  Color _getColor(String status) {
-    switch (status) {
-      case "Free":
-        return Colors.green;
-      case "Reserved":
-        return Colors.red;
-      case "Pending":
-        return Colors.amber;
-      default:
-        return Colors.grey;
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/rooms/slots'));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _rooms = data['rooms'];
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = "Failed to load rooms: ${response.statusCode}";
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = "Error loading rooms: $e";
+        _isLoading = false;
+      });
+    } finally {
+      if (mounted && _isLoading) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  // ✅ ฟังก์ชัน popup พร้อมบันทึกข้อมูลจริง
-  void _showBookingDialog(String roomName, String timeSlot) {
-    final TextEditingController reasonController = TextEditingController();
+  // ❇️ 6. ลบ _loadRoomsFromServer และ _loadBookingsFromServer
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Column(
-            children: [
-              Text("Booking $roomName",
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 20)),
-              const SizedBox(height: 6),
-              Text("Time : $timeSlot",
-                  style: const TextStyle(color: Colors.black54, fontSize: 14)),
-            ],
-          ),
-          content: TextField(
-            controller: reasonController,
-            decoration: InputDecoration(
-              hintText: "Enter reason for booking...",
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            ),
-          ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            ElevatedButton(
-              onPressed: () {
-                final reason = reasonController.text.trim();
-                Navigator.pop(context);
-
-                // ✅ บันทึกประวัติ
-                setState(() {
-                  _bookingHistory.add({
-                    "room": roomName,
-                    "time": timeSlot,
-                    "reason": reason.isEmpty ? "—" : reason,
-                    "status": "Pending",
-                  });
-                });
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text("✅ $roomName booked for $timeSlot",
-                        textAlign: TextAlign.center),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFA726),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Text("Book Now", style: TextStyle(color: Colors.white)),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-            ),
-          ],
-        );
-      },
-    );
+  Color _getColor(String status) {
+    switch (status) {
+      case "free":
+        return Colors.green;
+      case "reserved": // API ส่ง 'reserved'
+        return Colors.red;
+      case "pending":
+        return Colors.amber;
+      case "disabled": // API ส่ง 'disabled'
+        return Colors.grey;
+      default:
+        return Colors.blueGrey;
+    }
   }
 
-  // ✅ ฟังก์ชันส่งข้อมูลประวัติให้หน้า HistoryPage
-  List<Map<String, String>> getBookingHistory() => _bookingHistory;
+  // ❇️ 7. ลบ _showBookingDialog และ _resetAll (รวมถึง _resetStatic)
+
+  // ❇️ 8. สร้างฟังก์ชัน Logout ใหม่ที่เคลียร์ SharedPreferences
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear(); // ล้างข้อมูลล็อกอินทั้งหมด
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const LoginPage(),
+      ), // <-- This closing parenthesis was missing
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -165,21 +128,16 @@ class _RoomPageState extends State<RoomPage> {
                 builder: (context) => AlertDialog(
                   title: const Text("Logout",
                       style: TextStyle(fontWeight: FontWeight.bold)),
-                  content: const Text("Are you sure you want to log out?"),
+                  content: const Text(
+                      "Are you sure you want to log out?"), // ❇️ 10. แก้ไขข้อความ
                   actions: [
                     TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("Cancel"),
-                    ),
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Cancel")),
                     TextButton(
                       onPressed: () {
                         Navigator.pop(context);
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const LoginPage()),
-                          (route) => false,
-                        );
+                        _logout(); // ❇️ 11. เรียกใช้ฟังก์ชัน Logout ใหม่
                       },
                       child: const Text("Logout",
                           style: TextStyle(color: Colors.red)),
@@ -191,146 +149,227 @@ class _RoomPageState extends State<RoomPage> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // วันที่
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 1.5),
-                borderRadius: BorderRadius.circular(10),
+      // ❇️ 12. แก้ไข Body ทั้งหมด
+      body: RefreshIndicator(
+        onRefresh: _fetchRoomSlots,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // (ส่วน Today: Oct 5, 2025 ยังคงเดิม)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.black, width: 1.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.calendar_today_outlined,
+                        color: Colors.black54, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      "Today's Status", // ❇️ เปลี่ยนข้อความเป็นกลางๆ
+                      style: TextStyle(fontSize: 14, color: Colors.black87),
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
-                children: const [
-                  Icon(Icons.calendar_today_outlined,
-                      color: Colors.black54, size: 18),
-                  SizedBox(width: 8),
-                  Text(
-                    "Today: Oct 5, 2025",
-                    style: TextStyle(fontSize: 14, color: Colors.black87),
-                  ),
-                ],
-              ),
-            ),
+              const SizedBox(height: 12),
 
-// ✅ เพิ่มระยะห่างระหว่างช่องวันที่กับช่องเวลา
-            const SizedBox(height: 12),
-
-
-            // ตารางเวลา (คงเดิม)
-            SizedBox(
-              height: 45,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: timeSlots.length + 1,
-                separatorBuilder: (context, index) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.black26),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(
-                        child: Text("Room/Time",
-                            style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87)),
-                      ),
-                    );
-                  } else {
-                    final slot = timeSlots[index - 1];
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.black26),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(slot,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                                color: Colors.black87)),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Divider(thickness: 1, height: 20),
-
-            // ✅ ตารางห้อง (อัปเดต)
-            Expanded(
-              child: ListView.builder(
-                itemCount: rooms.length,
-                itemBuilder: (context, roomIndex) {
-                  final room = rooms[roomIndex];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 60,
-                          child: Text(room["name"],
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 14)),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: List.generate(
-                              room["status"].length,
-                              (statusIndex) {
-                                String status = room["status"][statusIndex];
-                                return Expanded(
-                                  child: GestureDetector(
-                                    onTap: status == "Free"
-                                        ? () => {} /*_showBookingDialog(
-                                              room["name"],
-                                              timeSlots[statusIndex],
-                                            )*/
-                                        : null,
-                                    child: Container(
-                                      margin: const EdgeInsets.symmetric(
-                                          horizontal: 2),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: _getColor(status),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(status,
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 12)),
+              // ❇️ 13. ตรวจสอบ Loading/Error ก่อนสร้าง UI
+              _isLoading
+                  ? const Expanded(
+                      child: Center(child: CircularProgressIndicator()))
+                  : _errorMessage.isNotEmpty
+                      ? Expanded(
+                          child: Center(
+                              child: Text(_errorMessage,
+                                  style: TextStyle(color: Colors.red))))
+                      : _rooms.isEmpty
+                          ? const Expanded(
+                              child: Center(child: Text("No rooms found.")))
+                          : Expanded(
+                              child: Column(
+                                children: [
+                                  // ❇️ 14. สร้าง Header Row (Time Slots) จาก API
+                                  SizedBox(
+                                    height: 45,
+                                    child: Row(
+                                      children: [
+                                        // "Room/Time" Header
+                                        Container(
+                                          width: 60, // ความกว้างเท่ากับชื่อห้อง
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 8),
+                                          margin:
+                                              const EdgeInsets.only(right: 8),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                                color: Colors.black26),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: const Center(
+                                            child: Text("Room",
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.black87)),
+                                          ),
+                                        ),
+                                        // Time Slots Headers
+                                        Expanded(
+                                          child: Row(
+                                            children: (_rooms[0]['time_slots']
+                                                    as List)
+                                                .map<Widget>((slot) {
+                                              return Expanded(
+                                                child: Container(
+                                                  margin: const EdgeInsets
+                                                      .symmetric(horizontal: 2),
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 4,
+                                                      vertical: 8),
+                                                  decoration: BoxDecoration(
+                                                    border: Border.all(
+                                                        color: Colors.black26),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                  ),
+                                                  child: Center(
+                                                    child: Text(slot['time'],
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            fontSize:
+                                                                11, // ❇️ ลดขนาด Fone
+                                                            color: Colors
+                                                                .black87)),
+                                                  ),
+                                                ),
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                );
-                              },
+                                  const Divider(thickness: 1, height: 20),
+
+                                  // ❇️ 15. สร้าง List ของ Rooms และ Status
+                                  Expanded(
+                                    child: ListView.builder(
+                                      itemCount: _rooms.length,
+                                      itemBuilder: (context, roomIndex) {
+                                        final room = _rooms[roomIndex];
+                                        final List<dynamic> slots =
+                                            room['time_slots'];
+
+                                        return Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 12),
+                                          child: Row(
+                                            children: [
+                                              // Room Name
+                                              SizedBox(
+                                                width: 60,
+                                                child: Text(room["name"],
+                                                    style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 14)),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              // Status Slots
+                                              Expanded(
+                                                child: Row(
+                                                  children:
+                                                      slots.map<Widget>((slot) {
+                                                    String status =
+                                                        slot['status'];
+
+                                                    // If an active filter is set, only highlight matching slots.
+                                                    final bool matchesFilter =
+                                                        _activeFilter == null ||
+                                                            status ==
+                                                                _activeFilter;
+
+                                                    Color cellColor;
+                                                    String displayText;
+
+                                                    if (room['status'] ==
+                                                        'disabled') {
+                                                      cellColor = Colors.grey;
+                                                      displayText = 'Disabled';
+                                                    } else if (!matchesFilter &&
+                                                        _activeFilter != null) {
+                                                      // subdued for non-matching when filter active
+                                                      cellColor =
+                                                          Colors.black12;
+                                                      displayText = '-';
+                                                    } else {
+                                                      cellColor =
+                                                          _getColor(status);
+                                                      displayText = status;
+                                                    }
+
+                                                    return Expanded(
+                                                      child: Container(
+                                                        margin: const EdgeInsets
+                                                            .symmetric(
+                                                            horizontal: 2),
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                vertical: 8),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: cellColor,
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(6),
+                                                        ),
+                                                        child: Text(
+                                                          displayText,
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                          style:
+                                                              const TextStyle(
+                                                                  color: Colors
+                                                                      .white,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                  fontSize: 11),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }).toList(),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
 
-      // ✅ ส่งข้อมูลไป HistoryPage
+      // ❇️ 17. แก้ไข BottomNavigationBar
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -350,8 +389,12 @@ class _RoomPageState extends State<RoomPage> {
           showUnselectedLabels: true,
           onTap: (index) {
             if (index == 0) {
-              Navigator.pushReplacement(context,MaterialPageRoute(builder: (context) => DashboardPage()));
-
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const DashboardPage()));
+            } else if (index == 1) {
+              // อยู่หน้านี้แล้ว
             } else if (index == 2) {
               Navigator.pushReplacement(
                   context,
@@ -361,7 +404,8 @@ class _RoomPageState extends State<RoomPage> {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => HistoryPage(history: _bookingHistory),
+                  // ❇️ 18. ไม่ต้องส่ง history ไปแล้ว เพราะ HistoryPage ดึงข้อมูลเอง
+                  builder: (context) => const HistoryPage(),
                 ),
               );
             }
@@ -369,7 +413,7 @@ class _RoomPageState extends State<RoomPage> {
           items: [
             const BottomNavigationBarItem(
               icon: Icon(Icons.home_filled),
-              label: "Dashboard",
+              label: "Home", // ❇️ 19. เปลี่ยนชื่อให้ตรงกับหน้าอื่น
             ),
             BottomNavigationBarItem(
               icon: Container(
