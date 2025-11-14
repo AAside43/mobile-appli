@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart'; // ❇️ 1. เพ
 import 'dashboard_page.dart';
 import 'approved_page.dart';
 import 'history_page.dart';
-import '../login_page.dart';
+import 'login_page.dart';
 import 'config.dart';
 
 class RoomPage extends StatefulWidget {
@@ -39,29 +39,41 @@ class _RoomPageState extends State<RoomPage> {
 
   // ❇️ 5. สร้างฟังก์ชันใหม่สำหรับเรียก GET /rooms/slots
   Future<void> _fetchRoomSlots() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
 
     try {
-      final response = await http.get(Uri.parse('$baseUrl/rooms/slots'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/rooms/slots'),
+      ).timeout(
+        const Duration(seconds: 8),
+        onTimeout: () {
+          throw Exception('Connection timeout');
+        },
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        if (!mounted) return;
         setState(() {
           _rooms = data['rooms'];
           _isLoading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _errorMessage = "Failed to load rooms: ${response.statusCode}";
           _isLoading = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = "Error loading rooms: $e";
+        _errorMessage = "Error loading rooms: ${e.toString().replaceAll('Exception: ', '')}";
         _isLoading = false;
       });
     } finally {
