@@ -14,7 +14,7 @@ const int _port = 3000;
 String get apiBaseUrl {
   // Use try/catch because Platform may not be available on all targets (web).
   try {
-    if (Platform.isAndroid) return 'http://10.0.2.2:$_port';
+    if (Platform.isAndroid) return 'http://192.168.47.1:$_port';
     if (Platform.isIOS) return 'http://localhost:$_port';
   } catch (_) {
     // ignore - fall back to default

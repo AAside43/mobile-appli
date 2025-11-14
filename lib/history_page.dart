@@ -56,6 +56,7 @@ class _HistoryPageState extends State<HistoryPage> {
   Future<void> _fetchHistory() async {
     // ❇️ ป้องกัน Error ถ้าหา Role ไม่เจอ
     if (_userId == null || _userRole == null) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = "User data not found. Please re-login.";
         _isLoading = false;
@@ -75,22 +76,32 @@ class _HistoryPageState extends State<HistoryPage> {
     // --- สิ้นสุดตรรกะ ---
 
     try {
-      final response = await http.get(Uri.parse(apiUrl));
+      final response = await http.get(
+        Uri.parse(apiUrl),
+      ).timeout(
+        const Duration(seconds: 8),
+        onTimeout: () {
+          throw Exception('Connection timeout');
+        },
+      );
 
       if (response.statusCode == 200) {
+        if (!mounted) return;
         setState(() {
           _historyList = json.decode(response.body)['bookings'];
           _isLoading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _errorMessage = "Failed to load history: ${response.statusCode}";
           _isLoading = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = "Error connecting to server: $e";
+        _errorMessage = "Error connecting to server: ${e.toString().replaceAll('Exception: ', '')}";
         _isLoading = false;
       });
     }

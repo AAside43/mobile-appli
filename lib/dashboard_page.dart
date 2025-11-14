@@ -38,23 +38,35 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // ❇️ 6. สร้างฟังก์ชันสำหรับเรียก API
   Future<void> _fetchDashboardStats() async {
+    if (!mounted) return;
+    
     try {
-      final response = await http.get(Uri.parse('$baseUrl/dashboard/stats'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/dashboard/stats'),
+      ).timeout(
+        const Duration(seconds: 8),
+        onTimeout: () {
+          throw Exception('Connection timeout');
+        },
+      );
 
       if (response.statusCode == 200) {
+        if (!mounted) return;
         setState(() {
           _stats = json.decode(response.body);
           _isLoading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _errorMessage = "Failed to load stats: ${response.statusCode}";
           _isLoading = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = "Error connecting to server: $e";
+        _errorMessage = "Error connecting to server: ${e.toString().replaceAll('Exception: ', '')}";
         _isLoading = false;
       });
     }

@@ -555,9 +555,11 @@ app.delete('/booking/:id', (req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🚀 Mobile app Server running on PORT ${PORT} `);
+const HOST = '0.0.0.0'; // Listen on all network interfaces
+app.listen(PORT, HOST, () => {
+    console.log(`🚀 Mobile app Server running on ${HOST}:${PORT}`);
     console.log("📁 Connected to 'mobi_app' MySQL database");
     console.log(`🌐 Test the connection at: http://localhost:${PORT}`);
+    console.log(`🌐 Emulator can connect at: http://192.168.47.1:${PORT}`);
     console.log(`🔍 Test database at: http://localhost:${PORT}/test-db`);
 });
