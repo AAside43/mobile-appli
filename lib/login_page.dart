@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'lecturer/config.dart';
+import 'config.dart';
 
 import 'register_page.dart';
-import 'lecturer/dashboard_page.dart';
+import 'dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -55,6 +55,11 @@ class _LoginPageState extends State<LoginPage> {
           'username': _studentIdController.text,
           'password': _passwordController.text,
         }),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Connection timeout. Please check your network.');
+        },
       );
 
       if (response.statusCode == 200) {
@@ -68,7 +73,7 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setBool('isLoggedIn', true);
 
         // ❇️ 5. ไปหน้า Dashboard
-        // (เราจะส่ง role ไปด้วยเผื่อ Dashboard ต้องใช้ในอนาคต)
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const DashboardPage()),
@@ -85,17 +90,21 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (e) {
       // --- เกิดข้อผิดพลาดในการเชื่อมต่อ ---
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error connecting to server: $e'),
+          content: Text('Error connecting to server: ${e.toString().replaceAll('Exception: ', '')}'),
           backgroundColor: Colors.grey,
+          duration: const Duration(seconds: 4),
         ),
       );
     } finally {
       // หยุดโหลด
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
