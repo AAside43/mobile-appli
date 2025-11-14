@@ -7,7 +7,7 @@ import 'room_page.dart';
 import 'history_page.dart';
 import 'config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login_page.dart';
+import '../login_page.dart';
 
 class ApprovedPage extends StatefulWidget {
   const ApprovedPage({Key? key}) : super(key: key);

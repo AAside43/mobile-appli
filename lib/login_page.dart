@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'config.dart';
+import 'lecturer/config.dart';
 
 import 'register_page.dart';
-import 'dashboard_page.dart';
+import 'lecturer/dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
