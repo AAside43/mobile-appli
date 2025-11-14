@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_appli_1/home_page.dart';
+import 'package:mobile_appli_1/student/home_page.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -7,7 +7,7 @@ import 'dart:convert';
 import 'home_page.dart';
 import 'checkrequest_page.dart';
 import 'history_page.dart';
-import 'login_page.dart';
+import '../login_page.dart';
 import '้home_page.dart';
 import 'user_session.dart';
 

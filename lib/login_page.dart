@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'lecturer/config.dart';
+
 import 'register_page.dart';
-// ignore: unused_import
-import 'home_page.dart';
-import '้home_page.dart';
-import 'user_session.dart';
+import 'lecturer/dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -19,11 +19,10 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _studentIdController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _isLoading = false;
 
-  // Server URL - use 10.0.2.2 for Android emulator (maps to host's localhost)
-  // For physical device, use your computer's IP address (e.g., 192.168.1.x:3000)
-  static const String serverUrl = 'http://192.168.57.1:3000';
+  // ❇️ 2. เพิ่มตัวแปรสำหรับ API
+  bool _isLoading = false;
+  final String baseUrl = apiBaseUrl; // centralized in lib/config.dart
 
   void _togglePasswordVisibility() {
     setState(() {
@@ -31,85 +30,74 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  // Updated login function to connect to mobi_app database via server
+  // ❇️ 3. แก้ไขฟังก์ชัน Login ทั้งหมด
   Future<void> _login() async {
     if (_studentIdController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Please enter both Student ID and Password."),
+          content: Text("Please enter both User ID and Password."),
           backgroundColor: Colors.redAccent,
         ),
       );
       return;
     }
 
+    // เริ่มโหลด
     setState(() {
       _isLoading = true;
     });
 
     try {
       final response = await http.post(
-        Uri.parse('$serverUrl/login'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        Uri.parse('$baseUrl/login'),
+        headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'username': _studentIdController.text,
           'password': _passwordController.text,
         }),
       );
 
-      setState(() {
-        _isLoading = false;
-      });
-
       if (response.statusCode == 200) {
+        // --- ล็อกอินสำเร็จ ---
         final data = json.decode(response.body);
-        if (data['success'] == true) {
-          // Save user session
-          UserSession.setUser(
-            data['userId'],
-            _studentIdController.text,
-            data['role'] ?? 'student',
-          );
-          
-          // Login successful - navigate to home page
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomePage()),
-          );
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Welcome ${data['role']}! ${data['message']}"),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+
+        // ❇️ 4. บันทึกข้อมูลผู้ใช้ลงใน SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('userId', data['userId']);
+        await prefs.setString('role', data['role']);
+        await prefs.setBool('isLoggedIn', true);
+
+        // ❇️ 5. ไปหน้า Dashboard
+        // (เราจะส่ง role ไปด้วยเผื่อ Dashboard ต้องใช้ในอนาคต)
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardPage()),
+        );
       } else {
-        // Login failed
-        final errorData = json.decode(response.body);
+        // --- ล็อกอินไม่สำเร็จ (เช่น รหัสผิด, username ผิด) ---
+        final data = json.decode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorData['error'] ?? 'Login failed'),
+            content: Text(data['error'] ?? 'Login failed. Please try again.'),
             backgroundColor: Colors.redAccent,
           ),
         );
       }
     } catch (e) {
+      // --- เกิดข้อผิดพลาดในการเชื่อมต่อ ---
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error connecting to server: $e'),
+          backgroundColor: Colors.grey,
+        ),
+      );
+    } finally {
+      // หยุดโหลด
       setState(() {
         _isLoading = false;
       });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Connection error: Please make sure the server is running on $serverUrl"),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -122,6 +110,7 @@ class _LoginPageState extends State<LoginPage> {
             key: _formKey,
             child: Column(
               children: [
+                // (... โค้ดส่วน Image และ Title เหมือนเดิม ...)
                 const SizedBox(height: 40),
 
                 // ===== IMAGE =====
@@ -153,6 +142,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 40),
 
+                // ( ... โค้ดส่วน User ID และ Password เหมือนเดิม ...)
                 // ===== USER ID =====
                 Container(
                   decoration: BoxDecoration(
@@ -214,9 +204,10 @@ class _LoginPageState extends State<LoginPage> {
 
                 // ===== LOGIN BUTTON =====
                 SizedBox(
-                  width: 180, // 👈 ขนาดเดิม
+                  width: 180,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _login, // Disable button when loading
+                    onPressed:
+                        _isLoading ? null : _login, // ❇️ 6. ปิดปุ่มขณะโหลด
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFA726),
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -224,10 +215,11 @@ class _LoginPageState extends State<LoginPage> {
                         borderRadius: BorderRadius.circular(30),
                       ),
                     ),
+                    // ❇️ 7. แสดงตัวหมุนขณะโหลด
                     child: _isLoading
                         ? const SizedBox(
-                            height: 20,
-                            width: 20,
+                            height: 18,
+                            width: 18,
                             child: CircularProgressIndicator(
                               color: Colors.white,
                               strokeWidth: 2,
@@ -245,6 +237,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 20),
 
+                // ( ... โค้ดส่วน Divider และ Register link เหมือนเดิม ...)
                 // ===== OR DIVIDER =====
                 Row(
                   children: const [
