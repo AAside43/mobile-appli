@@ -7,7 +7,7 @@ import 'room_page.dart';
 import 'history_page.dart';
 import 'config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../login_page.dart';
+import 'login_page.dart';
 
 class ApprovedPage extends StatefulWidget {
   const ApprovedPage({Key? key}) : super(key: key);
@@ -18,11 +18,17 @@ class ApprovedPage extends StatefulWidget {
 
 class _ApprovedPageState extends State<ApprovedPage> {
   int selectedIndex = 2;
-  final String baseUrl = apiBaseUrl; 
+  final String baseUrl = 'http://192.168.47.1:3000'; 
 
   List<dynamic> _requests = [];
   bool _isLoading = true;
   String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPendingRequests();
+  }
 
   // (ฟังก์ชัน _logout, _fetchPendingRequests, onTabTapped ... ไม่เปลี่ยนแปลง)
   Future<void> _logout() async {
@@ -39,26 +45,39 @@ class _ApprovedPageState extends State<ApprovedPage> {
   }
 
   Future<void> _fetchPendingRequests() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
     try {
-      final response = await http.get(Uri.parse('$baseUrl/bookings/pending'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/bookings/pending'),
+      ).timeout(
+        const Duration(seconds: 8),
+        onTimeout: () {
+          throw Exception('Connection timeout');
+        },
+      );
+      
       if (response.statusCode == 200) {
+        if (!mounted) return;
         setState(() {
           _requests = json.decode(response.body)['requests'];
           _isLoading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _errorMessage = "Failed to load requests: ${response.statusCode}";
           _isLoading = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = "Error connecting to server: $e";
+        _errorMessage = "Error connecting to server: ${e.toString().replaceAll('Exception: ', '')}";
         _isLoading = false;
       });
     }
@@ -101,6 +120,11 @@ class _ApprovedPageState extends State<ApprovedPage> {
           'approverId': approverId,
           'rejection_reason': rejectionReason // ❇️ ส่งเหตุผลไปที่นี่
         }),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Connection timeout');
+        },
       );
 
       if (response.statusCode == 200) {
