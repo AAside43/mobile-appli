@@ -7,7 +7,7 @@ import 'package:mobile_appli_1/lecturer/room_page.dart'; // ❇️ (สำหร
 import 'package:mobile_appli_1/lecturer/approved_page.dart'; // ❇️ (สำหรับ Lecturer)
 import 'package:mobile_appli_1/login_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'config.dart';
+import '../config.dart';
 // ❇️ (ลบ config.dart ที่ซ้ำออก)
 
 class HistoryPage extends StatefulWidget {

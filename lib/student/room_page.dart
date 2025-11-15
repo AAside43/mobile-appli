@@ -47,11 +47,11 @@ class _RoomPageState extends State<RoomPage> {
   static List<Map<String, dynamic>> rooms = [
     {
       "name": "Room 1",
-      "status": ["Free", "Reserved", "Reserved", "Reserved"]
+      "status": ["Free", "Free", "Free", "Free"]
     },
     {
       "name": "Room 2",
-      "status": ["Free", "Free", "Pending", "Reserved"]
+      "status": ["Free", "Free", "Free", "Free"]
     },
     {
       "name": "Room 3",
@@ -59,15 +59,19 @@ class _RoomPageState extends State<RoomPage> {
     },
     {
       "name": "Room 4",
-      "status": ["Free", "Pending", "Free", "Free"]
+      "status": ["Free", "Free", "Free", "Free"]
     },
     {
-      "name": "Room 5",
-      "status": ["Pending", "Free", "Reserved", "Free"]
+      "name": "Study room",
+      "status": ["Free", "Free", "Free", "Free"]
     },
     {
-      "name": "Room 6",
-      "status": ["Free", "Free", "Free", "Pending"]
+      "name": "meeting room",
+      "status": ["Free", "Free", "Free", "Free"]
+    },
+    {
+      "name": "entertaining space",
+      "status": ["Disable", "Disable", "Disable", "Disable"]
     },
   ];
 
@@ -82,11 +86,11 @@ class _RoomPageState extends State<RoomPage> {
   Future<void> _loadRoomsFromServer() async {
     try {
       final response = await http.get(Uri.parse('$serverUrl/rooms'));
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         List<dynamic> roomsData = data['rooms'];
-        
+
         setState(() {
           // Update static rooms with database data
           rooms = roomsData.map((room) {
@@ -94,7 +98,12 @@ class _RoomPageState extends State<RoomPage> {
               "room_id": room['room_id'].toString(),
               "name": room['name'],
               "is_available": room['is_available'] == 1,
-              "status": ["Free", "Free", "Free", "Free"] // Default to Free for all slots
+              "status": [
+                "Free",
+                "Free",
+                "Free",
+                "Free"
+              ] // Default to Free for all slots
             };
           }).toList();
         });
@@ -119,39 +128,41 @@ class _RoomPageState extends State<RoomPage> {
     try {
       // Get all bookings for current user
       final userId = UserSession.userId ?? 1;
-      final response = await http.get(
+      final response = await http
+          .get(
         Uri.parse('$serverUrl/user/$userId/bookings'),
-      ).timeout(
+      )
+          .timeout(
         const Duration(seconds: 10),
         onTimeout: () {
           throw Exception('Connection timeout');
         },
       );
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         List<dynamic> bookingsData = data['bookings'];
-        
+
         setState(() {
           // Reset all room statuses to Free first
           for (var room in rooms) {
             room['status'] = ["Free", "Free", "Free", "Free"];
           }
-          
+
           // Check if user has any active bookings (pending or confirmed, NOT cancelled)
-          _hasActiveBooking = bookingsData.any((booking) => 
-            booking['status'] == 'pending' || booking['status'] == 'confirmed'
-          );
-          
+          _hasActiveBooking = bookingsData.any((booking) =>
+              booking['status'] == 'pending' ||
+              booking['status'] == 'confirmed');
+
           // Update room statuses based on ACTIVE bookings only
           for (var booking in bookingsData) {
             String status = booking['status']?.toString() ?? '';
-            
+
             // Skip cancelled bookings
             if (status == 'cancelled') continue;
-            
+
             String roomId = booking['room_id']?.toString() ?? '';
-            
+
             // Find matching room and update first available slot
             for (var room in rooms) {
               if (room['room_id'] == roomId) {
@@ -159,7 +170,8 @@ class _RoomPageState extends State<RoomPage> {
                 List<String> statusList = List<String>.from(room['status']);
                 for (int i = 0; i < statusList.length; i++) {
                   if (statusList[i] == "Free") {
-                    statusList[i] = status == 'pending' ? 'Pending' : 'Reserved';
+                    statusList[i] =
+                        status == 'pending' ? 'Pending' : 'Reserved';
                     room['status'] = statusList;
                     break;
                   }
@@ -183,10 +195,10 @@ class _RoomPageState extends State<RoomPage> {
     switch (status) {
       case "Free":
         return Colors.green;
-      case "Reserved":
-        return Colors.red;
       case "Pending":
         return Colors.amber;
+      case "Reserved":
+        return Colors.red;
       default:
         return Colors.grey;
     }
@@ -200,12 +212,16 @@ class _RoomPageState extends State<RoomPage> {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             title: const Row(
               children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                Icon(Icons.warning_amber_rounded,
+                    color: Colors.orange, size: 28),
                 SizedBox(width: 10),
-                Text("Cannot Book", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                Text("Cannot Book",
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               ],
             ),
             content: const Text(
@@ -223,9 +239,9 @@ class _RoomPageState extends State<RoomPage> {
       );
       return;
     }
-    
+
     final TextEditingController reasonController = TextEditingController();
-    
+
     // Find room_id from roomName
     String? roomId;
     for (var room in rooms) {
@@ -270,8 +286,10 @@ class _RoomPageState extends State<RoomPage> {
 
                 // Determine booking status based on user role
                 // Students get 'pending' status, staff/lecturer get 'confirmed'
-                String bookingStatus = UserSession.isStudent ? 'pending' : 'confirmed';
-                String statusDisplay = UserSession.isStudent ? 'Pending' : 'Confirmed';
+                String bookingStatus =
+                    UserSession.isStudent ? 'pending' : 'confirmed';
+                String statusDisplay =
+                    UserSession.isStudent ? 'Pending' : 'Confirmed';
 
                 // Book room via server if roomId exists
                 if (roomId != null) {
@@ -288,10 +306,10 @@ class _RoomPageState extends State<RoomPage> {
 
                     if (response.statusCode == 201) {
                       final data = json.decode(response.body);
-                      
+
                       // Reload bookings to update UI
                       await _loadBookingsFromServer();
-                      
+
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
@@ -300,7 +318,9 @@ class _RoomPageState extends State<RoomPage> {
                                 : "✅ ${data['message']}",
                             textAlign: TextAlign.center,
                           ),
-                          backgroundColor: UserSession.isStudent ? Colors.amber : Colors.green,
+                          backgroundColor: UserSession.isStudent
+                              ? Colors.amber
+                              : Colors.green,
                         ),
                       );
                     }
@@ -325,7 +345,8 @@ class _RoomPageState extends State<RoomPage> {
                       if (timeIndex != -1 &&
                           room["status"][timeIndex] == "Free") {
                         // Set visual status based on user role
-                        room["status"][timeIndex] = UserSession.isStudent ? "Pending" : "Reserved";
+                        room["status"][timeIndex] =
+                            UserSession.isStudent ? "Pending" : "Reserved";
                       }
                       break;
                     }
@@ -367,11 +388,11 @@ class _RoomPageState extends State<RoomPage> {
     rooms = [
       {
         "name": "Room 1",
-        "status": ["Free", "Reserved", "Reserved", "Reserved"]
+        "status": ["Free", "Free", "Free", "Free"]
       },
       {
         "name": "Room 2",
-        "status": ["Free", "Free", "Pending", "Reserved"]
+        "status": ["Free", "Free", "Free", "Free"]
       },
       {
         "name": "Room 3",
@@ -379,15 +400,19 @@ class _RoomPageState extends State<RoomPage> {
       },
       {
         "name": "Room 4",
-        "status": ["Free", "Pending", "Free", "Free"]
+        "status": ["Free", "Free", "Free", "Free"]
       },
       {
-        "name": "Room 5",
-        "status": ["Pending", "Free", "Reserved", "Free"]
+        "name": "Study room",
+        "status": ["Free", "Free", "Free", "Free"]
       },
       {
-        "name": "Room 6",
-        "status": ["Free", "Free", "Free", "Pending"]
+        "name": "meeting room",
+        "status": ["Free", "Free", "Free", "Free"]
+      },
+      {
+        "name": "entertaining space",
+        "status": ["Disable", "Disable", "Disable", "Disable"]
       },
     ];
   }
@@ -473,7 +498,8 @@ class _RoomPageState extends State<RoomPage> {
               if (_hasActiveBooking)
                 Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.orange.shade50,
                     border: Border.all(color: Colors.orange, width: 1.5),
@@ -481,7 +507,8 @@ class _RoomPageState extends State<RoomPage> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                      Icon(Icons.info_outline,
+                          color: Colors.orange.shade700, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -497,116 +524,174 @@ class _RoomPageState extends State<RoomPage> {
                   ),
                 ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.black, width: 1.5),
-                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.black.withOpacity(0.25),
+                    width: 1,
+                  ),
                 ),
-              child: const Row(
-                children: [
-                  Icon(Icons.calendar_today_outlined,
-                      color: Colors.black54, size: 18),
-                  SizedBox(width: 8),
-                  Text("Today: Oct 5, 2025",
-                      style: TextStyle(fontSize: 14, color: Colors.black87)),
-                ],
+                child: Row(
+                  children: const [
+                    Icon(Icons.calendar_today_outlined,
+                        color: Colors.black54, size: 18),
+                    SizedBox(width: 10),
+                    Text(
+                      "Today's Status",
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  const SizedBox(
-                      width: 70,
-                      child: Text("Room/Time",
-                          style: TextStyle(fontWeight: FontWeight.bold))),
-                  ...timeSlots.map((slot) => Expanded(
-                        child: Center(
-                            child: Text(slot,
-                                style: const TextStyle(
+
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    // ====== ROOM BOX ======
+                    SizedBox(
+                      width: 80,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.black26, width: 1),
+                        ),
+                        child: const Center(
+                          child: Text("Room",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 6),
+
+                    // ====== TIME SLOTS BOXES ======
+                    Expanded(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: timeSlots.map((slot) {
+                          return Expanded(
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border:
+                                    Border.all(color: Colors.black26, width: 1),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  slot,
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 13))),
-                      )),
-                ],
-              ),
-            ),
-            const Divider(thickness: 1, height: 20),
-            Expanded(
-              child: ListView.builder(
-                itemCount: rooms.length,
-                itemBuilder: (context, roomIndex) {
-                  final room = rooms[roomIndex];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                            width: 60,
-                            child: Text(room["name"],
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold))),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: List.generate(
-                              room["status"].length,
-                              (statusIndex) {
-                                String status = room["status"][statusIndex];
-                                bool canBook = status == "Free" && !_hasActiveBooking;
-                                return Expanded(
-                                  child: GestureDetector(
-                                    onTap: canBook
-                                        ? () => _showBookingDialog(
-                                              room["name"],
-                                              timeSlots[statusIndex],
-                                            )
-                                        : status == "Free" && _hasActiveBooking
-                                            ? () {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                      '⚠️ You already have an active booking',
-                                                      textAlign: TextAlign.center,
-                                                    ),
-                                                    backgroundColor: Colors.orange,
-                                                    duration: Duration(seconds: 2),
-                                                  ),
-                                                );
-                                              }
-                                            : null,
-                                    child: Container(
-                                      margin: const EdgeInsets.symmetric(
-                                          horizontal: 2),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: _getColor(status),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(status,
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 12)),
-                                    ),
+                                    fontSize: 13,
                                   ),
-                                );
-                              },
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(thickness: 1, height: 20),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: rooms.length,
+                  itemBuilder: (context, roomIndex) {
+                    final room = rooms[roomIndex];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                              width: 60,
+                              child: Text(room["name"],
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold))),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: List.generate(
+                                room["status"].length,
+                                (statusIndex) {
+                                  String status = room["status"][statusIndex];
+                                  bool canBook =
+                                      status == "Free" && !_hasActiveBooking;
+                                  return Expanded(
+                                    child: GestureDetector(
+                                      onTap: canBook
+                                          ? () => _showBookingDialog(
+                                                room["name"],
+                                                timeSlots[statusIndex],
+                                              )
+                                          : status == "Free" &&
+                                                  _hasActiveBooking
+                                              ? () {
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        '⚠️ You already have an active booking',
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                      ),
+                                                      backgroundColor:
+                                                          Colors.orange,
+                                                      duration:
+                                                          Duration(seconds: 2),
+                                                    ),
+                                                  );
+                                                }
+                                              : null,
+                                      child: Container(
+                                        margin: const EdgeInsets.symmetric(
+                                            horizontal: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: _getColor(status),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Text(status,
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 12)),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -658,8 +743,8 @@ class _RoomPageState extends State<RoomPage> {
                   color: Color(0xFFFFA726),
                   shape: BoxShape.circle,
                 ),
-                child:
-                    const Icon(Icons.meeting_room_outlined, color: Colors.white),
+                child: const Icon(Icons.meeting_room_outlined,
+                    color: Colors.white),
               ),
               label: "Room",
             ),

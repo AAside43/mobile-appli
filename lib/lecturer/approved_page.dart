@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'dashboard_page.dart';
 import 'room_page.dart';
 import 'history_page.dart';
-import 'config.dart';
+import '../config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../login_page.dart';
 

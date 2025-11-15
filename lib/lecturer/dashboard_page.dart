@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import 'approved_page.dart'; // ❇️ เพิ่ม import สำหรับ approved_page
-import 'config.dart';
+import '../config.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});

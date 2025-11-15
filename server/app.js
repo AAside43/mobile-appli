@@ -11,7 +11,15 @@ const cors = require('cors');
 // db.initializeDatabase();
 
 // Middleware
-app.use(cors()); // Allow cross-origin requests from Flutter app
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type"],
+}));
+
+
+
+// Allow cross-origin requests from Flutter app
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

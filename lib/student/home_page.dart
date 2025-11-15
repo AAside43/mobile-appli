@@ -30,11 +30,11 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadRoomsFromServer() async {
     try {
       final response = await http.get(Uri.parse('$serverUrl/rooms'));
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         List<dynamic> roomsData = data['rooms'];
-        
+
         setState(() {
           rooms = roomsData.map((room) {
             return {
@@ -90,18 +90,25 @@ class _HomePageState extends State<HomePage> {
         },
         {
           "name": "Room 4",
-          "capacity": "16 people",
+          "capacity": " 4 seats",
           "image": "assets/images/Room1.jpg"
         },
         {
-          "name": "Room 5",
-          "capacity": "8 people",
+          "name": "101 study room",
+          "capacity": "Comfortable room with seat and television",
           "image": "assets/images/Room2.jpg"
         },
         {
-          "name": "Room 6",
+          "name": "102 meeting room",
+          "capacity": "10 seat",
+          "image": "assets/images/Room3.jpg"
+          
+        },
+        {
+          "name": "103 enteraining space",
           "capacity": "16 people",
           "image": "assets/images/Room3.jpg"
+          
         },
       ];
       _isLoading = false;

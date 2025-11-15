@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:mobile_appli_1/student/home_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'lecturer/config.dart';
+import 'config.dart';
 
 import 'register_page.dart';
 import 'lecturer/dashboard_page.dart';
@@ -42,64 +43,65 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    // เริ่มโหลด
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final response = await http.post(
+      final response = await http
+          .post(
         Uri.parse('$baseUrl/login'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
-          'username': _studentIdController.text,
+          'username': _studentIdController.text, // ✔ ตรงกับ backend
           'password': _passwordController.text,
         }),
-      ).timeout(
+      )
+          .timeout(
         const Duration(seconds: 10),
         onTimeout: () {
-          throw Exception('Connection timeout. Please check your network.');
+          throw Exception('Timeout → Cannot reach server ($baseUrl/login)');
         },
       );
 
       if (response.statusCode == 200) {
-        // --- ล็อกอินสำเร็จ ---
         final data = json.decode(response.body);
 
-        // ❇️ 4. บันทึกข้อมูลผู้ใช้ลงใน SharedPreferences
+        // ✔ Save login info
         final prefs = await SharedPreferences.getInstance();
         await prefs.setInt('userId', data['userId']);
         await prefs.setString('role', data['role']);
         await prefs.setBool('isLoggedIn', true);
 
-        // ❇️ 5. ไปหน้า Dashboard
         if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const DashboardPage()),
-        );
-      } else {
-        // --- ล็อกอินไม่สำเร็จ (เช่น รหัสผิด, username ผิด) ---
-        final data = json.decode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['error'] ?? 'Login failed. Please try again.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+
+        // 👇👇 เลือกหน้าแรกตาม role 👇👇
+        if (data['role'] == 'student') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomePage()),
+          );
+        } else if (data['role'] == 'lecturer' || data['role'] == 'staff') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const DashboardPage()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginPage()),
+          );
+        }
       }
     } catch (e) {
-      // --- เกิดข้อผิดพลาดในการเชื่อมต่อ ---
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error connecting to server: ${e.toString().replaceAll('Exception: ', '')}'),
+          content: Text("Cannot connect → $baseUrl/login\n$e"),
           backgroundColor: Colors.grey,
-          duration: const Duration(seconds: 4),
         ),
       );
     } finally {
-      // หยุดโหลด
       if (mounted) {
         setState(() {
           _isLoading = false;

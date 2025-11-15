@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'login_page.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'lecturer/config.dart'; 
+import 'config.dart'; 
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({Key? key}) : super(key: key);
