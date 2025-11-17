@@ -425,7 +425,7 @@ class _RoomPageState extends State<RoomPage> {
           items: [
             const BottomNavigationBarItem(
               icon: Icon(Icons.home_filled),
-              label: "Home", // ❇️ 19. เปลี่ยนชื่อให้ตรงกับหน้าอื่น
+              label: "Dashboard", // ❇️ 19. เปลี่ยนชื่อให้ตรงกับหน้าอื่น
             ),
             BottomNavigationBarItem(
               icon: Container(

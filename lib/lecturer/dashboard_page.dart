@@ -87,49 +87,61 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   // ❇️ 7. (Optional) สร้าง Widget helper เพื่อความสะอาด
-  Widget _buildStatCard(String label, int count, Color color) {
-    return GestureDetector(
-      onTap: () {
-        // Map the label to a slot status understood by RoomPage
-        String? statusFilter;
-        final lower = label.toLowerCase();
-        if (lower.contains('pending')) statusFilter = 'pending';
-        if (lower.contains('free')) statusFilter = 'free';
-        if (lower.contains('disabled')) statusFilter = 'disabled';
-        if (lower.contains('reserved')) statusFilter = 'reserved';
+  Widget _buildStatCardGrid(String label, int count) {
+  return GestureDetector(
+    onTap: () {
+      String? statusFilter;
+      final lower = label.toLowerCase();
+      if (lower.contains('pending')) statusFilter = 'pending';
+      if (lower.contains('free')) statusFilter = 'free';
+      if (lower.contains('disabled')) statusFilter = 'disabled';
+      if (lower.contains('reserved')) statusFilter = 'reserved';
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => RoomPage(filterStatus: statusFilter),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(12),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => RoomPage(filterStatus: statusFilter),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              count.toString(),
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
+      );
+    },
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[300],      // สีเทาอ่อน
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          )
+        ],
       ),
-    );
-  }
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            count.toString(),
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -183,45 +195,44 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ],
       ),
-      // ❇️ 8. แก้ไข Body ให้แสดงผลตามสถานะการโหลด
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage.isNotEmpty
-                ? Center(
-                    child: Text(_errorMessage,
-                        style: TextStyle(color: Colors.red)))
-                : SingleChildScrollView(
-                    child: Column(
-                      // ❇️ ใช้ Key และ Label ให้ตรงกับ app.js
-                      children: [
-                        _buildStatCard(
-                          "Pending Slots", // Label
-                          _stats['pending_slots'] ?? 0, // ❇️ Key: pending_slots
-                          Colors.yellow,
-                        ),
-                        _buildStatCard(
-                          "Free Slots", // Label
-                          _stats['free_slots'] ?? 0, // ❇️ Key: free_slots
-                          Colors.green,
-                        ),
-                        _buildStatCard(
-                          "Disabled Rooms", // Label
-                          _stats['disabled_rooms'] ??
-                              0, // ❇️ Key: disabled_rooms
-                          Colors.grey,
-                        ),
-                        _buildStatCard(
-                          "Reserved Slots", // Label
-                          _stats['reserved_slots'] ??
-                              0, // ❇️ Key: reserved_slots
-                          Colors.red,
-                        ),
-                      ],
-                    ),
-                  ),
-      ),
+      // ❇️ 8. ปรับดีไซน์ใหม่เป็น 2x2 Grid สีเทา
+body: Padding(
+  padding: const EdgeInsets.all(16.0),
+  child: _isLoading
+      ? const Center(child: CircularProgressIndicator())
+      : _errorMessage.isNotEmpty
+          ? Center(
+              child: Text(
+                _errorMessage,
+                style: const TextStyle(color: Colors.red),
+              ),
+            )
+          : GridView.count(
+              crossAxisCount: 2,               // 2 คอลัมน์
+              crossAxisSpacing: 12,            // ระยะห่างระหว่างช่องแนวตั้ง
+              mainAxisSpacing: 12,             // ระยะห่างระหว่างช่องแนวนอน
+              childAspectRatio: 1.2,           // อัตราส่วนกล่อง
+              children: [
+                _buildStatCardGrid(
+                  "Pending Slots",
+                  _stats['pending_slots'] ?? 0,
+                ),
+                _buildStatCardGrid(
+                  "Free Slots",
+                  _stats['free_slots'] ?? 0,
+                ),
+                _buildStatCardGrid(
+                  "Disabled Rooms",
+                  _stats['disabled_rooms'] ?? 0,
+                ),
+                _buildStatCardGrid(
+                  "Reserved Slots",
+                  _stats['reserved_slots'] ?? 0,
+                ),
+              ],
+            ),
+),
+
       // ❇️ 9. แก้ไข BottomNavigationBar ให้ตรงกับหน้าอื่น
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -253,7 +264,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       child: const Icon(Icons.home_filled, color: Colors.white),
                     )
                   : const Icon(Icons.home_filled),
-              label: "Home", // ❇️ เปลี่ยน Label
+              label: "Dashboard", // ← เปลี่ยนจาก Home เป็น Dashboard
             ),
             const BottomNavigationBarItem(
                 icon: Icon(Icons.meeting_room_outlined), label: "Room"),

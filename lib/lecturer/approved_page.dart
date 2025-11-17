@@ -320,7 +320,7 @@ class _ApprovedPageState extends State<ApprovedPage> {
           onTap: onTabTapped,
           items: [
             BottomNavigationBarItem(
-                icon: Icon(Icons.home_filled), label: "Home"),
+                icon: Icon(Icons.home_filled), label: "Dashboard"),
             BottomNavigationBarItem(
                 icon: Icon(Icons.meeting_room_outlined), label: "Room"),
             BottomNavigationBarItem(

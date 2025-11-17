@@ -333,7 +333,7 @@ class _HistoryPageState extends State<HistoryPage> {
               ? [
                   const BottomNavigationBarItem(
                     icon: Icon(Icons.home_filled),
-                    label: "Home",
+                    label: "Dashboard",
                   ),
                   const BottomNavigationBarItem(
                     icon: Icon(Icons.meeting_room_outlined),

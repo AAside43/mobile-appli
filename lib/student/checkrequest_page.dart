@@ -16,13 +16,11 @@ class CheckRequestPage extends StatefulWidget {
 }
 
 class _CheckRequestPageState extends State<CheckRequestPage> {
-  // Server URL - use 10.0.2.2 for Android emulator
   static const String serverUrl = 'http://192.168.57.1:3000';
-  
-  // ✅ Use actual user from session
-  String get userRole => UserSession.role ?? 'student';
+
   int get userId => UserSession.userId ?? 1;
-  
+  String get userRole => UserSession.role ?? "student";
+
   List<Map<String, dynamic>> requestList = [];
   bool _isLoading = true;
 
@@ -32,246 +30,200 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
     _loadBookingRequests();
   }
 
-  // Load booking requests from server
+  // ==============================
+  // LOAD BOOKING REQUESTS (SERVER)
+  // ==============================
   Future<void> _loadBookingRequests() async {
-    setState(() {
-      _isLoading = true;
-    });
-    
+    setState(() => _isLoading = true);
+
     try {
-      final response = await http.get(
-        Uri.parse('$serverUrl/user/$userId/bookings'),
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw Exception('Connection timeout');
-        },
-      );
-      
+      final response =
+          await http.get(Uri.parse('$serverUrl/user/$userId/bookings'));
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        List<dynamic> bookingsData = data['bookings'];
-        
+        List<dynamic> list = data["bookings"];
+
         setState(() {
-          requestList = bookingsData.map((booking) {
+          requestList = list.map((b) {
             return {
-              "booking_id": booking['booking_id']?.toString() ?? "",
-              "room": booking['room_name']?.toString() ?? "Unknown Room",
-              "room_id": booking['room_id']?.toString() ?? "",
-              "description": booking['description']?.toString() ?? '',
-              "capacity": booking['capacity']?.toString() ?? '0',
-              "status": booking['status']?.toString() ?? 'unknown',
-              "reservedBy": "You", // Current user
+              "booking_id": b["booking_id"].toString(),
+              "room": b["room_name"] ?? "Unknown room",
+              "room_id": b["room_id"]?.toString() ?? "",
+              "description": b["description"] ?? "",
+              "capacity": b["capacity"]?.toString() ?? "",
+              "time": b["time_slot"] ?? "",
+              "date": b["booking_date"] ?? "",
+              "reason": b["reason"] ?? "",
+              "status": b["status"] ?? "Pending",
+              "reservedBy": UserSession.username ?? "You",
             };
           }).toList();
+
           _isLoading = false;
         });
       } else {
-        print('Server returned status: ${response.statusCode}');
-        // Fallback to local data if server fails
+        print("❌ Server responded with ${response.statusCode}");
         _useLocalRequests();
       }
     } catch (e) {
-      print('Error loading booking requests: $e');
-      // If server is not available, use local data
+      print("❌ Error: $e");
       _useLocalRequests();
     }
   }
 
+  // ==============================
+  // LOCAL FALLBACK
+  // ==============================
   void _useLocalRequests() {
-    final allRequests = RoomPage.getBookingHistory();
+    final local = RoomPage.getBookingHistory();
+
     setState(() {
-      requestList = userRole == "student"
-          ? allRequests.where((req) => req["reservedBy"] == "Student A").toList()
-          : allRequests;
+      requestList = local;
       _isLoading = false;
     });
   }
 
-  // Cancel booking
+  // ==============================
+  // CANCEL BOOKING
+  // ==============================
   Future<void> _cancelBooking(String bookingId) async {
-    // Validate booking ID
-    if (bookingId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('❌ Invalid booking ID'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-    
     try {
-      print('Attempting to cancel booking: $bookingId');
-      print('Server URL: $serverUrl/booking/$bookingId');
-      
-      final response = await http.delete(
-        Uri.parse('$serverUrl/booking/$bookingId'),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw Exception('Connection timeout - Server not responding');
-        },
-      );
-      
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-      
+      final response =
+          await http.delete(Uri.parse('$serverUrl/booking/$bookingId'));
+
       if (response.statusCode == 200) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Booking cancelled successfully!'),
+            content: Text("✅ Booking cancelled successfully!"),
             backgroundColor: Colors.green,
           ),
         );
-        // Reload booking requests
-        await _loadBookingRequests();
+        _loadBookingRequests();
       } else {
         if (!mounted) return;
-        // Show more detailed error message
-        final errorMsg = response.statusCode == 404 
-            ? 'Booking not found' 
-            : 'Failed to cancel (Status: ${response.statusCode})';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ $errorMsg'),
+            content: Text("❌ Failed : ${response.statusCode}"),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
           ),
         );
       }
     } catch (e) {
-      print('Error canceling booking: $e');
+      print("Cancel error: $e");
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Error: ${e.toString()}'),
+          content: Text("❌ Error: $e"),
           backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
         ),
       );
     }
   }
 
-  // Show cancel confirmation dialog
+  // ==============================
+  // CONFIRM CANCEL DIALOG
+  // ==============================
   void _showCancelDialog(String bookingId, String roomName) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Row(
-            children: [
-              Icon(Icons.cancel_outlined, color: Colors.red, size: 28),
-              SizedBox(width: 10),
-              Text("Cancel Booking", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            ],
-          ),
-          content: Text(
-            "Are you sure you want to cancel your booking for $roomName?",
-            style: const TextStyle(fontSize: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("No", style: TextStyle(color: Colors.grey)),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _cancelBooking(bookingId);
-              },
-              child: const Text("Yes, Cancel", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-            ),
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Row(
+          children: [
+            Icon(Icons.cancel_outlined, color: Colors.red),
+            SizedBox(width: 8),
+            Text("Cancel Booking"),
           ],
-        );
-      },
+        ),
+        content: Text("Do you want to cancel the booking for $roomName?"),
+        actions: [
+          TextButton(
+            child: const Text("No"),
+            onPressed: () => Navigator.pop(context),
+          ),
+          TextButton(
+            child: const Text("Yes", style: TextStyle(color: Colors.red)),
+            onPressed: () {
+              Navigator.pop(context);
+              _cancelBooking(bookingId);
+            },
+          ),
+        ],
+      ),
     );
+  }
+
+  // Color of status badge
+  Color _statusColor(String status) {
+    status = status.toLowerCase();
+    if (status == "pending") return Colors.amber;
+    if (status == "approved" || status == "confirmed") return Colors.green;
+    if (status == "rejected" || status == "cancelled") return Colors.red;
+    return Colors.grey;
   }
 
   @override
   Widget build(BuildContext context) {
-    // ignore: unused_local_variable
-    int selectedIndex = 2;
-
-    // ignore: unused_element
-    void onTabTapped(int index) {
-      if (index == 0) {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const HomePage()));
-      } else if (index == 1) {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const RoomPage()));
-      } else if (index == 3) {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const HistoryPage()));
-      }
-    }
-
     return Scaffold(
       backgroundColor: Colors.white,
+
+      // ==============================
+      // APP BAR
+      // ==============================
       appBar: AppBar(
-  backgroundColor: Colors.white,
-  elevation: 1,
-  centerTitle: true,
-  title: const Text(
-    "Check Request",
-    style: TextStyle(
-      fontWeight: FontWeight.bold,
-      color: Colors.black,
-    ),
-  ),
-  actions: [
-    IconButton(
-      icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 26),
-      onPressed: () {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            title: const Text(
-              "Logout",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            content: const Text(
-                "Are you sure you want to log out and reset all data?"),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Cancel"),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  // ✅ รีเซ็ตค่าทั้งหมด โดยเรียกฟังก์ชัน reset จาก RoomPage
-                  RoomPage.resetAll();
-
-                  // ✅ กลับไปหน้า LoginPage
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const LoginPage()),
-                    (route) => false,
-                  );
-                },
-                child:
-                    const Text("Logout", style: TextStyle(color: Colors.red)),
-              ),
-            ],
+        backgroundColor: Colors.white,
+        elevation: 1,
+        centerTitle: true,
+        title: const Text(
+          "Check Request",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
-        );
-      },
-    ),
-  ],
-),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 26),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text("Logout"),
+                  content: const Text("Logout and reset all data?"),
+                  actions: [
+                    TextButton(
+                      child: const Text("Cancel"),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    TextButton(
+                      child: const Text("Logout",
+                          style: TextStyle(color: Colors.red)),
+                      onPressed: () {
+                        RoomPage.resetAll();
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LoginPage()),
+                          (_) => false,
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
 
+      // ==============================
+      // BODY
+      // ==============================
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFFFFA726),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFFFFA726)),
             )
           : Padding(
               padding: const EdgeInsets.all(16),
@@ -283,19 +235,19 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
                           Icon(Icons.pending_actions,
                               size: 64, color: Colors.grey),
                           SizedBox(height: 16),
-                          Text(
-                            "No booking requests found",
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
-                          ),
+                          Text("No requests found",
+                              style:
+                                  TextStyle(fontSize: 16, color: Colors.grey)),
                         ],
                       ),
                     )
                   : ListView.builder(
                       itemCount: requestList.length,
-                      itemBuilder: (context, index) {
+                      itemBuilder: (_, index) {
                         final item = requestList[index];
+
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
+                          margin: const EdgeInsets.only(bottom: 14),
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -303,12 +255,15 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
                             border: Border.all(color: Colors.grey.shade200),
                             boxShadow: [
                               BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 8)
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 6),
                             ],
                           ),
                           child: Row(
                             children: [
+                              // =====================
+                              // LEFT SIDE DETAILS
+                              // =====================
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,88 +271,98 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
                                     Row(
                                       children: [
                                         const Icon(Icons.meeting_room,
-                                            size: 20, color: Color(0xFF3E7BFA)),
+                                            color: Color(0xFF3E7BFA)),
                                         const SizedBox(width: 8),
-                                        Text(item["room"] ?? "-",
-                                            style: const TextStyle(
-                                                color: Color(0xFF3E7BFA),
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold)),
+                                        Text(
+                                          item["room"],
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                              color: Color(0xFF3E7BFA)),
+                                        ),
                                       ],
                                     ),
                                     const SizedBox(height: 8),
-                                    if (item["description"] != null &&
-                                        item["description"]!.isNotEmpty)
+                                    if ((item["date"] ?? "").isNotEmpty)
+                                      Text("Date: ${item["date"]}"),
+                                    if ((item["time"] ?? "").isNotEmpty)
+                                      Text("Time: ${item["time"]}"),
+                                    if ((item["description"] ?? "").isNotEmpty)
                                       Text(
-                                          "Description: ${item["description"]}",
-                                          style: const TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.black87)),
-                                    if (item["capacity"] != null)
-                                      Text(
-                                          "Capacity: ${item["capacity"]} people",
-                                          style: const TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.black87)),
-                                    const SizedBox(height: 4),
+                                          "Description: ${item["description"]}"),
+                                    if ((item["reason"] ?? "").isNotEmpty)
+                                      Text("Reason: ${item["reason"]}"),
                                     Text(
-                                        "Booking ID: ${item["booking_id"] ?? "-"}",
-                                        style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.black54)),
-                                    if (item["time"] != null)
-                                      Text("Time: ${item["time"]}",
-                                          style: const TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.black87)),
-                                    if (item["reason"] != null)
-                                      Text("Reason: ${item["reason"]}",
-                                          style: const TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.black87)),
+                                      "Booking ID: ${item["booking_id"]}",
+                                      style: const TextStyle(
+                                          fontSize: 12, color: Colors.black54),
+                                    ),
+                                    if (userRole != "student")
+                                      Text(
+                                          "Reserved by: ${item["reservedBy"]}"),
                                   ],
                                 ),
                               ),
+
                               const SizedBox(width: 12),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: item["status"] == "pending"
-                                      ? Colors.amber
-                                      : item["status"] == "confirmed"
-                                          ? Colors.green
-                                          : item["status"] == "cancelled"
-                                              ? Colors.red
-                                              : Colors.grey,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(item["status"] ?? "Unknown",
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold)),
+
+                              // =====================
+                              // STATUS BADGE
+                              // =====================
+                              Column(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: _statusColor(item["status"]),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      item["status"],
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 8),
+
+                                  // Cancel button only when pending
+                                  if (item["status"].toLowerCase() == "pending")
+                                    TextButton(
+                                      child: const Text(
+                                        "Cancel",
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                      onPressed: () => _showCancelDialog(
+                                          item["booking_id"], item["room"]),
+                                    ),
+                                ],
                               ),
                             ],
                           ),
                         );
-                },
-              ),
-      ),
+                      },
+                    ),
+            ),
+
+      // ==============================
+      // BOTTOM NAV
+      // ==============================
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, -2)),
           ],
         ),
         child: BottomNavigationBar(
-          currentIndex: 2, // ✅ หน้านี้คือ Check Request
-          type: BottomNavigationBarType.fixed,
+          currentIndex: 2,
           selectedItemColor: const Color(0xFFFFA726),
           unselectedItemColor: Colors.black54,
           showUnselectedLabels: true,
@@ -409,22 +374,17 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
               Navigator.pushReplacement(
                   context, MaterialPageRoute(builder: (_) => const RoomPage()));
             } else if (index == 2) {
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (_) => const CheckRequestPage()));
-            } else if (index == 3) {
+            } // current page
+            else if (index == 3) {
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const HistoryPage()));
             }
           },
           items: [
             const BottomNavigationBarItem(
-              icon: Icon(Icons.home_filled),
-              label: "Home",
-            ),
+                icon: Icon(Icons.home_filled), label: "Home"),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.meeting_room_outlined),
-              label: "Room",
-            ),
+                icon: Icon(Icons.meeting_room_outlined), label: "Room"),
             BottomNavigationBarItem(
               icon: Container(
                 padding: const EdgeInsets.all(6),
@@ -437,9 +397,7 @@ class _CheckRequestPageState extends State<CheckRequestPage> {
               label: "Check Request",
             ),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.history),
-              label: "History",
-            ),
+                icon: Icon(Icons.history), label: "History"),
           ],
         ),
       ),

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-// ignore: unused_import
+import 'package:intl/intl.dart';
+
 import 'home_page.dart';
 import 'room_page.dart';
 import 'checkrequest_page.dart';
@@ -16,13 +17,11 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  // Server URL - use 10.0.2.2 for Android emulator
   static const String serverUrl = 'http://192.168.57.1:3000';
-  
-  // ✅ Use actual user from session
-  String get userRole => UserSession.role ?? 'student';
+
   int get userId => UserSession.userId ?? 1;
-  
+  String get userRole => UserSession.role ?? "student";
+
   List<Map<String, dynamic>> historyList = [];
   bool _isLoading = true;
 
@@ -32,86 +31,88 @@ class _HistoryPageState extends State<HistoryPage> {
     _loadBookingHistory();
   }
 
-  // Load booking history from server
+  // =============================
+  // LOAD HISTORY FROM SERVER
+  // =============================
   Future<void> _loadBookingHistory() async {
     try {
-      final response = await http.get(
-        Uri.parse('$serverUrl/user/$userId/bookings'),
-      );
-      
+      final response =
+          await http.get(Uri.parse('$serverUrl/user/$userId/bookings'));
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        List<dynamic> bookingsData = data['bookings'];
-        
+        List<dynamic> list = data["bookings"];
+
         setState(() {
-          historyList = bookingsData.map((booking) {
+          historyList = list.map((b) {
             return {
-              "booking_id": booking['booking_id'].toString(),
-              "room": booking['room_name'],
-              "room_id": booking['room_id'].toString(),
-              "description": booking['description'] ?? '',
-              "capacity": booking['capacity'].toString(),
-              "status": booking['status'],
-              "reservedBy": "You", // Current user
+              "booking_id": b["booking_id"].toString(),
+              "room": b["room_name"] ?? "Unknown room",
+              "room_id": b["room_id"]?.toString() ?? "",
+              "description": b["description"] ?? "",
+              "capacity": b["capacity"]?.toString() ?? "",
+              "time": b["time_slot"],
+              "date": b["booking_date"],
+              "reason": b["reason"] ?? "",
+              "status": b["status"] ?? "Pending",
+              "reservedBy": b["reserved"] ?? "-",
+              "approvedBy": b["approved"] ?? "-",
+              "rejection_reason": b["rejection_reason"] ?? "",
             };
           }).toList();
+
+          // sort: latest → oldest
+          historyList.sort((a, b) {
+            try {
+              final da = DateFormat("MMM d, yyyy").parse(a["date"]);
+              final db = DateFormat("MMM d, yyyy").parse(b["date"]);
+              return db.compareTo(da);
+            } catch (_) {
+              return 0;
+            }
+          });
+
           _isLoading = false;
         });
       } else {
-        // Fallback to local data if server fails
+        print("❌ Server returned ${response.statusCode}");
         _useLocalHistory();
       }
     } catch (e) {
-      // If server is not available, use local data
+      print("❌ Error loading history: $e");
       _useLocalHistory();
     }
   }
 
+  // Local fallback if server unreachable
   void _useLocalHistory() {
-    final allHistory = RoomPage.getBookingHistory();
+    final local = RoomPage.getBookingHistory();
     setState(() {
-      historyList = userRole == "student"
-          ? allHistory.where((h) => h["reservedBy"] == "Student A").toList()
-          : allHistory;
+      historyList = local;
       _isLoading = false;
     });
   }
 
-  Color _getStatusColor(String status) {
-    if (status == "Approved" || status == "confirmed") return Colors.green;
-    if (status == "Rejected" || status == "cancelled") return Colors.red;
-    if (status == "Pending" || status == "pending") return Colors.amber;
-    return Colors.grey;
+  // =============================
+  // STATUS COLOR
+  // =============================
+  Color _statusColor(String s) {
+    s = s.toLowerCase();
+    if (s == "approved") return Colors.green;
+    if (s == "pending") return Colors.amber;
+    if (s == "rejected") return Colors.red;
+    if (s == "cancelled") return Colors.grey;
+    return Colors.black54;
   }
 
   @override
   Widget build(BuildContext context) {
-    // ignore: unused_local_variable
-    int selectedIndex = 3;
-
-    final allHistory = RoomPage.getBookingHistory();
-
-    // ✅ แยกบทบาท
-    final historyList = userRole == "student"
-        ? allHistory.where((h) => h["reservedBy"] == "Student A").toList()
-        : allHistory;
-
-    // ignore: unused_element
-    void onTabTapped(int index) {
-      if (index == 0) {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const HomePage()));
-      } else if (index == 1) {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const RoomPage()));
-      } else if (index == 2) {
-        Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => const CheckRequestPage()));
-      }
-    }
-
     return Scaffold(
       backgroundColor: Colors.white,
+
+      // =============================
+      // APP BAR
+      // =============================
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
@@ -125,45 +126,29 @@ class _HistoryPageState extends State<HistoryPage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 26),
+            icon: const Icon(Icons.logout_rounded, color: Colors.red),
             onPressed: () {
               showDialog(
                 context: context,
-                builder: (context) => AlertDialog(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  title: const Text(
-                    "Logout",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  content: const Text(
-                      "Are you sure you want to log out and reset all data?"),
+                builder: (_) => AlertDialog(
+                  title: const Text("Logout"),
+                  content: const Text("Logout and reset all data?"),
                   actions: [
                     TextButton(
-                      onPressed: () => Navigator.pop(context),
                       child: const Text("Cancel"),
+                      onPressed: () => Navigator.pop(context),
                     ),
                     TextButton(
+                      child: const Text("Logout",
+                          style: TextStyle(color: Colors.red)),
                       onPressed: () {
-                        Navigator.pop(context);
-
-                        // ✅ รีเซ็ตค่าทั้งหมดจาก RoomPage
                         RoomPage.resetAll();
-
-                        // ✅ กลับไปหน้า LoginPage
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginPage(),
-                          ),
-                          (route) => false,
+                          MaterialPageRoute(builder: (_) => const LoginPage()),
+                          (_) => false,
                         );
                       },
-                      child: const Text(
-                        "Logout",
-                        style: TextStyle(color: Colors.red),
-                      ),
                     ),
                   ],
                 ),
@@ -172,142 +157,145 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
         ],
       ),
+
+      // =============================
+      // BODY
+      // =============================
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFFFFA726),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFFFFA726)),
             )
           : Padding(
               padding: const EdgeInsets.all(16),
               child: historyList.isEmpty
                   ? const Center(
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.history, size: 64, color: Colors.grey),
                           SizedBox(height: 16),
                           Text(
-                            "No booking history yet",
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                            "No history yet",
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
                           ),
                         ],
                       ),
                     )
                   : ListView.builder(
                       itemCount: historyList.length,
-                      itemBuilder: (context, index) {
+                      itemBuilder: (_, index) {
                         final item = historyList[index];
+
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
+                          margin: const EdgeInsets.only(bottom: 14),
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.grey.shade200),
                             boxShadow: [
-                              BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 6)
+                              BoxShadow(color: Colors.black12, blurRadius: 6),
                             ],
                           ),
+
+                          // =============================
+                          // CARD BODY
+                          // =============================
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // LEFT DETAILS
                               Expanded(
                                 child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.meeting_room,
-                                              size: 20,
-                                              color: Color(0xFF3E7BFA)),
-                                          const SizedBox(width: 8),
-                                          Text(item["room"] ?? "-",
-                                              style: const TextStyle(
-                                                  color: Color(0xFF3E7BFA),
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold)),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      if (item["description"] != null &&
-                                          item["description"]!.isNotEmpty)
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.meeting_room,
+                                            color: Color(0xFF3E7BFA)),
+                                        const SizedBox(width: 8),
                                         Text(
-                                            "Description: ${item["description"]}",
-                                            style: const TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black87)),
-                                      if (item["capacity"] != null)
-                                        Text(
-                                            "Capacity: ${item["capacity"]} people",
-                                            style: const TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black87)),
+                                          item["room"],
+                                          style: const TextStyle(
+                                              fontSize: 16,
+                                              color: Color(0xFF3E7BFA),
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    if ((item["date"] ?? "").isNotEmpty)
+                                      Text("Date: ${item["date"]}"),
+                                    if ((item["time"] ?? "").isNotEmpty)
+                                      Text("Time: ${item["time"]}"),
+                                    if ((item["description"] ?? "").isNotEmpty)
+                                      Text(
+                                          "Description: ${item["description"]}"),
+                                    if ((item["reason"] ?? "").isNotEmpty)
+                                      Text("Reason: ${item["reason"]}"),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "Booking ID: ${item["booking_id"]}",
+                                      style: const TextStyle(
+                                          fontSize: 12, color: Colors.black54),
+                                    ),
+                                    if (userRole != "student") ...[
                                       const SizedBox(height: 4),
                                       Text(
-                                          "Booking ID: ${item["booking_id"] ?? "-"}",
-                                          style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.black54)),
-                                      if (item["time"] != null)
-                                        Text("Time: ${item["time"]}",
-                                            style: const TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black87)),
-                                      if (item["reason"] != null)
-                                        Text("Reason: ${item["reason"]}",
-                                            style: const TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black87)),
-                                      if (userRole != "student") ...[
-                                        const SizedBox(height: 4),
+                                          "Reserved by: ${item["reservedBy"]}"),
+                                      if ((item["approvedBy"] ?? "") != "")
                                         Text(
-                                            "Reserved by: ${item["reservedBy"] ?? "-"}",
-                                            style: const TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black87)),
-                                      ]
-                                    ]),
+                                            "Approved by: ${item["approvedBy"]}"),
+                                      if ((item["rejection_reason"] ?? "")
+                                          .isNotEmpty)
+                                        Text(
+                                            "Rejection Reason: ${item["rejection_reason"]}"),
+                                    ]
+                                  ],
+                                ),
                               ),
+
                               const SizedBox(width: 12),
+
+                              // STATUS BADGE
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
-                                    color: _getStatusColor(
-                                        item["status"] ?? ""),
-                                    borderRadius: BorderRadius.circular(8)),
-                                child: Text(item["status"] ?? "",
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold)),
+                                  color: _statusColor(item["status"]),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  item["status"],
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12),
+                                ),
                               ),
                             ],
                           ),
                         );
                       },
-              ),
-      ),
+                    ),
+            ),
+
+      // =============================
+      // BOTTOM NAV
+      // =============================
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
+                color: Colors.black26,
+                blurRadius: 8,
+                offset: const Offset(0, -2)),
           ],
         ),
         child: BottomNavigationBar(
-          currentIndex: 3, // ✅ หน้านี้คือ History
-          type: BottomNavigationBarType.fixed,
+          currentIndex: 3,
           selectedItemColor: const Color(0xFFFFA726),
           unselectedItemColor: Colors.black54,
-          showUnselectedLabels: true,
           onTap: (index) {
             if (index == 0) {
               Navigator.pushReplacement(
@@ -318,24 +306,15 @@ class _HistoryPageState extends State<HistoryPage> {
             } else if (index == 2) {
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const CheckRequestPage()));
-            } else if (index == 3) {
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (_) => const HistoryPage()));
-            }
+            } else if (index == 3) {}
           },
           items: [
             const BottomNavigationBarItem(
-              icon: Icon(Icons.home_filled),
-              label: "Home",
-            ),
+                icon: Icon(Icons.home_filled), label: "Home"),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.meeting_room_outlined),
-              label: "Room",
-            ),
+                icon: Icon(Icons.meeting_room_outlined), label: "Room"),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.checklist_rtl),
-              label: "Check Request",
-            ),
+                icon: Icon(Icons.checklist_rtl), label: "Check Request"),
             BottomNavigationBarItem(
               icon: Container(
                 padding: const EdgeInsets.all(6),

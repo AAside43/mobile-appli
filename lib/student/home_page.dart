@@ -213,7 +213,7 @@ class _HomePageState extends State<HomePage> {
                     Icon(Icons.calendar_today_outlined, color: Colors.black54),
                     SizedBox(width: 10),
                     Text(
-                      "Today: Oct 5, 2025",
+                      "Today: Nov 21, 2025",
                       style: TextStyle(fontSize: 15, color: Colors.black87),
                     ),
                   ],
