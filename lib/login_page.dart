@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:mobile_appli_1/student/home_page.dart';
+import 'package:mobile_appli_1/student/student_home_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 
 import 'register_page.dart';
-import 'lecturer/dashboard_page.dart';
+import 'student/student_home_page.dart';
+import 'lecturer/lecturer_dashboard_page.dart';
+import 'staff/staff_dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -21,7 +23,7 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  // ❇️ 2. เพิ่มตัวแปรสำหรับ API
+  // 2. เพิ่มตัวแปรสำหรับ API
   bool _isLoading = false;
   final String baseUrl = apiBaseUrl; // centralized in lib/config.dart
 
@@ -31,7 +33,7 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  // ❇️ 3. แก้ไขฟังก์ชัน Login ทั้งหมด
+  // 3. แก้ไขฟังก์ชัน Login ทั้งหมด
   Future<void> _login() async {
     if (_studentIdController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -66,25 +68,41 @@ class _LoginPageState extends State<LoginPage> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        print("Login Response: $data");
 
-        // ✔ Save login info
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setInt('userId', data['userId']);
-        await prefs.setString('role', data['role']);
+
+        // ตรวจสอบว่ามีข้อมูลหรือไม่ก่อนบันทึก
+        if (data['userId'] != null) {
+          await prefs.setInt('userId', data['userId']);
+        }
+
+        await prefs.setString('role', data['role'] ?? 'student');
         await prefs.setBool('isLoggedIn', true);
+
+        if (data['token'] != null) {
+          await prefs.setString('token', data['token']);
+        } else {
+          throw Exception("Token is missing from server response");
+        }
 
         if (!mounted) return;
 
-        // 👇👇 เลือกหน้าแรกตาม role 👇👇
+        // เลือกหน้าแรกตาม role
         if (data['role'] == 'student') {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const HomePage()),
+            MaterialPageRoute(builder: (_) => const StudentHomePage()),
           );
-        } else if (data['role'] == 'lecturer' || data['role'] == 'staff') {
+        } else if (data['role'] == 'lecturer') {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const DashboardPage()),
+            MaterialPageRoute(builder: (_) => const LecturerDashboardPage()),
+          );
+        } else if (data['role'] == 'staff') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const StaffDashboardPage()),
           );
         } else {
           Navigator.pushReplacement(
@@ -217,8 +235,7 @@ class _LoginPageState extends State<LoginPage> {
                 SizedBox(
                   width: 180,
                   child: ElevatedButton(
-                    onPressed:
-                        _isLoading ? null : _login, // ❇️ 6. ปิดปุ่มขณะโหลด
+                    onPressed: _isLoading ? null : _login, // 6. ปิดปุ่มขณะโหลด
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFA726),
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -226,7 +243,7 @@ class _LoginPageState extends State<LoginPage> {
                         borderRadius: BorderRadius.circular(30),
                       ),
                     ),
-                    // ❇️ 7. แสดงตัวหมุนขณะโหลด
+                    // 7. แสดงตัวหมุนขณะโหลด
                     child: _isLoading
                         ? const SizedBox(
                             height: 18,
