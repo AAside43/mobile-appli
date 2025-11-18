@@ -1,10 +1,11 @@
-
 const express = require('express');
 const app = express();
 const db = require('./db');
 const con = db;
 const bcrypt = require('bcrypt');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const secretKey = 'My_Secret_Key_1234';
 
 // Initialize database from mobi_app.sql on server start (optional - comment out after first run)
 // Uncomment this line only when you want to reset/initialize the database
@@ -16,8 +17,6 @@ app.use(cors({
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type"],
 }));
-
-
 
 // Allow cross-origin requests from Flutter app
 app.use(express.json());
@@ -161,11 +160,19 @@ app.post('/login', (req, res) => {
                 return res.status(500).json({ error: "Hashing error" });
             }
             if (same) {
-                // ส่ง 'role' กลับไปให้ Flutter app เพื่อใช้แยกระหว่าง student, lecturer, staff
+                const user = results[0];
+
+                const token = jwt.sign(
+                    { userId: user.user_id, role: user.role },
+                    secretKey,
+                    { expiresIn: '24h' } // Token หมดอายุใน 24 ชม.
+                );
+
                 return res.json({
                     message: "Login successful",
-                    userId: results[0].user_id,
-                    role: results[0].role,
+                    userId: user.user_id,
+                    role: user.role,
+                    token: token,
                     success: true
                 });
             }
@@ -206,7 +213,7 @@ app.get('/rooms', (_req, res) => {
 
 // --- ⬇️ NEW/MODIFIED ENDPOINTS BASED ON REQUIREMENTS ⬇️ ---
 
-// ❇️ MODIFIED ENDPOINT: Get dashboard stats (Counts slots, but disabled as rooms)
+// MODIFIED ENDPOINT: Get dashboard stats (Counts slots, but disabled as rooms)
 app.get('/dashboard/stats', async (req, res) => {
     // กำหนดว่ามี 4 slots ต่อห้อง
     const SLOTS_PER_ROOM = 4;
@@ -246,8 +253,8 @@ app.get('/dashboard/stats', async (req, res) => {
             message: "Dashboard stats retrieved",
             pending_slots: pendingSlotCount,
             reserved_slots: reservedSlotCount,
-            disabled_rooms: disabledRoomCount, // ❇️ ส่ง Key นี้
-            free_slots: totalFreeSlots       // ❇️ ส่ง Key นี้
+            disabled_rooms: disabledRoomCount, 
+            free_slots: totalFreeSlots       
         });
 
     } catch (err) {
@@ -304,9 +311,9 @@ app.get('/rooms/slots', (req, res) => {
     });
 });
 
-// ❇️ MODIFIED ENDPOINT: Get pending bookings (for approved_page.dart)
+// MODIFIED ENDPOINT: Get pending bookings (for approved_page.dart)
 app.get('/bookings/pending', (req, res) => {
-    // ❇️ 1. อัปเดต SQL: เพิ่ม image_url และ LEFT JOIN roomimages
+    // อัปเดต SQL: เพิ่ม image_url และ LEFT JOIN roomimages
     const sql = `
         SELECT 
             b.booking_id, b.booking_date, b.time_slot, b.reason,
@@ -341,7 +348,7 @@ app.get('/bookings/pending', (req, res) => {
             time_slot: item.time_slot,
             reason: item.reason,
             student_name: item.student_name,
-            image_url: item.image_url // ❇️ 2. ส่ง URL รูปภาพไปให้แอป
+            image_url: item.image_url // ส่ง URL รูปภาพไปให้แอป
         }));
 
         res.json({
@@ -351,7 +358,7 @@ app.get('/bookings/pending', (req, res) => {
     });
 });
 
-// ❇️ NEW ENDPOINT: Get ALL completed bookings (for Lecturer/Staff History Page)
+// NEW ENDPOINT: Get ALL completed bookings (for Lecturer/Staff History Page)
 app.get('/bookings/history', (req, res) => {
     // ดึงข้อมูลทั้งหมดที่ status ไม่ใช่ 'pending' หรือ 'cancelled'
     const sql = `
@@ -399,10 +406,10 @@ app.get('/bookings/history', (req, res) => {
     });
 });
 
-// ❇️ MODIFIED ENDPOINT: Approve/Disapprove booking (now with rejection_reason)
+// MODIFIED ENDPOINT: Approve/Disapprove booking (now with rejection_reason)
 app.put('/booking/:id/status', (req, res) => {
     const bookingId = req.params.id;
-    // ❇️ 1. ดึง rejection_reason ที่ส่งมาจาก Pop-up
+    // ดึง rejection_reason ที่ส่งมาจาก Pop-up
     const { status, approverId, rejection_reason } = req.body;
 
     if (!status || !approverId) {
@@ -412,7 +419,7 @@ app.put('/booking/:id/status', (req, res) => {
         return res.status(400).json({ error: "Invalid status. Must be 'approved' or 'rejected'" });
     }
 
-    // ❇️ 2. อัปเดต SQL Query ให้บันทึกเหตุผลด้วย
+    // อัปเดต SQL Query ให้บันทึกเหตุผลด้วย
     // (ถ้า status เป็น 'approved', ค่า reason จะเป็น null ซึ่งถูกต้อง)
     const sql = "UPDATE bookings SET status = ?, approver_id = ?, rejection_reason = ? WHERE booking_id = ? AND status = 'pending'";
 
@@ -432,7 +439,7 @@ app.put('/booking/:id/status', (req, res) => {
     });
 });
 
-// ⛔️ MODIFIED ENDPOINT: Book a room
+// MODIFIED ENDPOINT: Book a room
 // (ปรับปรุงให้ตรงตามข้อกำหนด "A student can book time slot for only today", "status is pending", "book a single slot in one day")
 app.post('/book-room', (req, res) => {
     // สมมติว่า client ส่ง 'booking_date' (YYYY-MM-DD) และ 'time_slot' (เช่น '08:00-10:00')
@@ -484,7 +491,7 @@ app.post('/book-room', (req, res) => {
     });
 });
 
-// ⛔️ MODIFIED ENDPOINT: Get user's bookings (for history_page.dart)
+// MODIFIED ENDPOINT: Get user's bookings (for history_page.dart)
 // (ปรับปรุงให้รวมข้อมูล "who approved", "date", "time", "reason" ตามที่ history_page ต้องการ)
 app.get('/user/:id/bookings', (req, res) => {
     const userId = req.params.id;
@@ -559,7 +566,6 @@ app.delete('/booking/:id', (req, res) => {
 });
 
 // --- ⬆️ END OF NEW/MODIFIED ENDPOINTS ⬆️ ---
-
 
 // Start server
 const PORT = process.env.PORT || 3000;
