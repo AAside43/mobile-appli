@@ -339,11 +339,11 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
           unselectedItemColor: Colors.black54,
           onTap: (index) {
             if (index == 0) {
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (_) => const StudentHomePage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const StudentHomePage()));
             } else if (index == 1) {
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (_) => const StudentRoomPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const StudentRoomPage()));
             } else if (index == 2) {
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const StudentCheckPage()));

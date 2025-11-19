@@ -77,6 +77,7 @@ class _StaffRoomPageState extends State<StaffRoomPage> {
     final room = roomList[index];
     final roomId = room['room_id'];
 
+    // Optimistically update UI
     setState(() {
       roomList[index]['is_available'] = currentValue ? 1 : 0;
     });
@@ -87,23 +88,50 @@ class _StaffRoomPageState extends State<StaffRoomPage> {
         Uri.parse('$baseUrl/rooms/$roomId'),
         headers: headers,
         body: json.encode({
-          ...room,
           "is_available": currentValue,
-          "status": currentValue ? "available" : "disabled"
         }),
       );
 
-      if (response.statusCode != 200) {
+      if (response.statusCode == 200) {
+        // Success - show confirmation
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(currentValue 
+                ? "Room enabled successfully" 
+                : "Room disabled successfully"),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // Revert on failure
         setState(() {
           roomList[index]['is_available'] = !currentValue ? 1 : 0;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Failed to update status")));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Failed to update room status"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
+      // Revert on error
       setState(() {
         roomList[index]['is_available'] = !currentValue ? 1 : 0;
       });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error: ${e.toString()}"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

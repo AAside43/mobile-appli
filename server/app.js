@@ -15,7 +15,7 @@ const secretKey = 'My_Secret_Key_1234';
 app.use(cors({
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type"],
+    allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 // Allow cross-origin requests from Flutter app
@@ -209,6 +209,38 @@ app.get('/rooms', (_req, res) => {
             rooms: results
         });
     })
+});
+
+// Update room status (for staff to enable/disable rooms)
+app.put('/rooms/:id', (req, res) => {
+    const roomId = req.params.id;
+    const { is_available } = req.body;
+
+    // Validate the is_available value
+    if (is_available === undefined) {
+        return res.status(400).json({ error: "is_available field is required" });
+    }
+
+    // Convert boolean to integer (0 or 1) for database
+    const availableValue = is_available ? 1 : 0;
+
+    const sql = "UPDATE rooms SET is_available = ? WHERE room_id = ?";
+    con.query(sql, [availableValue, roomId], function (err, result) {
+        if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: "Database server error" });
+        }
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "Room not found" });
+        }
+
+        res.json({
+            message: "Room status updated successfully",
+            roomId: roomId,
+            is_available: availableValue
+        });
+    });
 });
 
 // --- ⬇️ NEW/MODIFIED ENDPOINTS BASED ON REQUIREMENTS ⬇️ ---

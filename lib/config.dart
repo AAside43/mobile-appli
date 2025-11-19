@@ -8,7 +8,7 @@ String get apiBaseUrl {
   if (kIsWeb) return 'http://localhost:3000';
 
   try {
-    if (Platform.isAndroid) return 'http://10.0.2.2:$_port';
+    if (Platform.isAndroid) return 'http://192.168.47.1:$_port';
     if (Platform.isIOS) return 'http://localhost:$_port';
   } catch (_) {}
 

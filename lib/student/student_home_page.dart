@@ -364,8 +364,7 @@ class _StudentHomePageState extends State<StudentHomePage> {
           showUnselectedLabels: true,
           onTap: (index) {
             if (index == 0) {
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (_) => const StudentHomePage()));
+              // Already on Home, do nothing
             } else if (index == 1) {
               Navigator.pushReplacement(
                   context, MaterialPageRoute(builder: (_) => const StudentRoomPage()));
