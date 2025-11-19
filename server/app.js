@@ -20,8 +20,9 @@ app.use(cors({
 }));
 
 // Allow cross-origin requests from Flutter app
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increase body size limit for image uploads (50MB)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Helper function to get local IP address
 function getLocalIPAddress() {

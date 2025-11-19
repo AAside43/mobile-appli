@@ -384,8 +384,10 @@ class _StaffEditRoomPageState extends State<StaffEditRoomPage> {
               children: [
                 ElevatedButton(
                   onPressed: _isLoading ? null : _updateRoom,
-                  style:
-                      ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
                   child: _isLoading
                       ? const SizedBox(
                           width: 20,
@@ -395,7 +397,10 @@ class _StaffEditRoomPageState extends State<StaffEditRoomPage> {
                 ),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
                   child: const Text("Cancel"),
                 ),
               ],

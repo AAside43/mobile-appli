@@ -192,7 +192,7 @@ class _StaffAddRoomPageState extends State<StaffAddRoomPage> {
           "name": _roomNameController.text,
           "description": _descriptionController.text,
           "capacity": int.tryParse(_capacityController.text) ?? 1,
-          "is_available": true,
+          "is_available": false,
           "image": imageBase64
         }),
       );
@@ -323,8 +323,10 @@ class _StaffAddRoomPageState extends State<StaffAddRoomPage> {
               children: [
                 ElevatedButton(
                   onPressed: _isLoading ? null : _saveRoom,
-                  style:
-                      ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
                   child: _isLoading
                       ? const SizedBox(
                           width: 20,
@@ -334,7 +336,10 @@ class _StaffAddRoomPageState extends State<StaffAddRoomPage> {
                 ),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
                   child: const Text("Cancel"),
                 ),
               ],
