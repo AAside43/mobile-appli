@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const secretKey = 'My_Secret_Key_1234';
+const os = require('os');
 
 // Initialize database from mobi_app.sql on server start (optional - comment out after first run)
 // Uncomment this line only when you want to reset/initialize the database
@@ -22,14 +23,42 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Helper function to get local IP address
+function getLocalIPAddress() {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            // Skip internal (loopback) and non-IPv4 addresses
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+    return '0.0.0.0';
+}
+
+// Get server IP endpoint (for auto-configuration)
+app.get('/server-ip', (req, res) => {
+    const localIP = getLocalIPAddress();
+    res.json({
+        ip: localIP,
+        port: PORT,
+        url: `http://${localIP}:${PORT}`
+    });
+});
+
 // Test endpoint
 app.get('/', (req, res) => {
+    const localIP = getLocalIPAddress();
     res.json({
         message: 'Mobile App Server is running!',
         database: 'mobi_app',
         server: 'Connected to mobi_app MySQL database',
+        serverIP: localIP,
+        serverURL: `http://${localIP}:${PORT}`,
         endpoints: [
             'GET / - This test endpoint',
+            'GET /server-ip - Get server IP address',
             'GET /test-db - Test database connection',
             'POST /init-db - Initialize database from mobi_app.sql',
             'POST /login - User authentication',
@@ -683,9 +712,12 @@ app.delete('/booking/:id', (req, res) => {
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0'; // Listen on all network interfaces
 app.listen(PORT, HOST, () => {
+    const localIP = getLocalIPAddress();
     console.log(`🚀 Mobile app Server running on ${HOST}:${PORT}`);
     console.log("📁 Connected to 'mobi_app' MySQL database");
-    console.log(`🌐 Test the connection at: http://localhost:${PORT}`);
-    console.log(`🌐 Emulator can connect at: http://192.168.47.1:${PORT}`);
-    console.log(`🔍 Test database at: http://localhost:${PORT}/test-db`);
+    console.log(`🌐 Local Network: http://${localIP}:${PORT}`);
+    console.log(`🌐 Localhost: http://localhost:${PORT}`);
+    console.log(`🌐 Android Emulator: http://10.0.2.2:${PORT}`);
+    console.log(`📱 Use this URL in your Flutter app: http://${localIP}:${PORT}`);
+    console.log(`🔍 Get server IP: http://${localIP}:${PORT}/server-ip`);
 });
