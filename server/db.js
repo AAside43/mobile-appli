@@ -18,6 +18,20 @@ con.connect(function(err) {
         return;
     }
     console.log('Connected to mobi_app database as id ' + con.threadId);
+    
+    // Auto-migrate: Add image column if it doesn't exist
+    const addImageColumn = `
+        ALTER TABLE rooms 
+        ADD COLUMN IF NOT EXISTS image LONGTEXT
+    `;
+    
+    con.query(addImageColumn, function(err) {
+        if (err && !err.message.includes('Duplicate column')) {
+            console.warn('Note: Image column migration skipped or already exists');
+        } else {
+            console.log('✅ Database schema updated: image column added to rooms table');
+        }
+    });
 });
 
 // Function to initialize database from mobi_app.sql

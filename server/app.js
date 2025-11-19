@@ -198,7 +198,7 @@ app.get('/user/:id', (req, res) => {
 
 // Get all rooms (Original simple version)
 app.get('/rooms', (_req, res) => {
-    const sql = "SELECT r.room_id, r.name, r.description, r.capacity, r.is_available FROM rooms r ORDER BY r.room_id";
+    const sql = "SELECT r.room_id, r.name, r.description, r.capacity, r.is_available, r.image FROM rooms r ORDER BY r.room_id";
     con.query(sql, function (err, results) {
         if (err) {
             console.error('Database error:', err);
@@ -211,36 +211,116 @@ app.get('/rooms', (_req, res) => {
     })
 });
 
-// Update room status (for staff to enable/disable rooms)
-app.put('/rooms/:id', (req, res) => {
-    const roomId = req.params.id;
-    const { is_available } = req.body;
+// Add new room (for staff)
+app.post('/rooms', (req, res) => {
+    const { name, description, capacity, is_available, image } = req.body;
 
-    // Validate the is_available value
-    if (is_available === undefined) {
-        return res.status(400).json({ error: "is_available field is required" });
+    // Validate required fields
+    if (!name || !capacity) {
+        return res.status(400).json({ error: "Name and capacity are required" });
     }
 
-    // Convert boolean to integer (0 or 1) for database
+    // Convert boolean to integer for database
     const availableValue = is_available ? 1 : 0;
 
-    const sql = "UPDATE rooms SET is_available = ? WHERE room_id = ?";
-    con.query(sql, [availableValue, roomId], function (err, result) {
+    // If image is provided as base64, store it; otherwise use null
+    const sql = "INSERT INTO rooms (name, description, capacity, is_available, image) VALUES (?, ?, ?, ?, ?)";
+    const values = [
+        name,
+        description || '',
+        parseInt(capacity) || 1,
+        availableValue,
+        image || null
+    ];
+
+    con.query(sql, values, function (err, result) {
         if (err) {
             console.error('Database error:', err);
-            return res.status(500).json({ error: "Database server error" });
+            return res.status(500).json({ error: "Database server error", details: err.message });
         }
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: "Room not found" });
-        }
-
-        res.json({
-            message: "Room status updated successfully",
-            roomId: roomId,
-            is_available: availableValue
+        res.status(201).json({
+            message: "Room added successfully",
+            roomId: result.insertId
         });
     });
+});
+
+// Update room (for staff to edit room details including image)
+app.put('/rooms/:id', (req, res) => {
+    const roomId = req.params.id;
+    const { name, description, capacity, is_available, image } = req.body;
+
+    // Check if it's a status-only update (for toggle switch)
+    if (is_available !== undefined && !name && !description && !capacity) {
+        // Status-only update
+        const availableValue = is_available ? 1 : 0;
+        const sql = "UPDATE rooms SET is_available = ? WHERE room_id = ?";
+        con.query(sql, [availableValue, roomId], function (err, result) {
+            if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: "Database server error" });
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: "Room not found" });
+            }
+
+            res.json({
+                message: "Room status updated successfully",
+                roomId: roomId,
+                is_available: availableValue
+            });
+        });
+    } else {
+        // Full room update (including image)
+        const updates = [];
+        const values = [];
+
+        if (name !== undefined) {
+            updates.push("name = ?");
+            values.push(name);
+        }
+        if (description !== undefined) {
+            updates.push("description = ?");
+            values.push(description);
+        }
+        if (capacity !== undefined) {
+            updates.push("capacity = ?");
+            values.push(parseInt(capacity));
+        }
+        if (is_available !== undefined) {
+            updates.push("is_available = ?");
+            values.push(is_available ? 1 : 0);
+        }
+        if (image !== undefined) {
+            updates.push("image = ?");
+            values.push(image);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: "No fields to update" });
+        }
+
+        values.push(roomId);
+        const sql = `UPDATE rooms SET ${updates.join(', ')} WHERE room_id = ?`;
+
+        con.query(sql, values, function (err, result) {
+            if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: "Database server error", details: err.message });
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: "Room not found" });
+            }
+
+            res.json({
+                message: "Room updated successfully",
+                roomId: roomId
+            });
+        });
+    }
 });
 
 // --- ⬇️ NEW/MODIFIED ENDPOINTS BASED ON REQUIREMENTS ⬇️ ---

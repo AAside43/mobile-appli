@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
 import '../config.dart';
 import '../login_page.dart';
 import 'staff_room_page.dart';
@@ -20,6 +24,15 @@ class _StaffAddRoomPageState extends State<StaffAddRoomPage> {
 
   final String baseUrl = apiBaseUrl;
   bool _isLoading = false;
+  File? _selectedImage;
+  String? _selectedAssetImage;
+  final ImagePicker _picker = ImagePicker();
+  
+  final List<String> _assetImages = [
+    'assets/images/Room1.jpg',
+    'assets/images/Room2.jpg',
+    'assets/images/Room3.jpg',
+  ];
 
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
@@ -42,12 +55,136 @@ class _StaffAddRoomPageState extends State<StaffAddRoomPage> {
     };
   }
 
+  Future<void> _showImageSourceDialog() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Choose Image Source'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Colors.blue),
+              title: const Text('Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImageFromGallery();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder, color: Colors.orange),
+              title: const Text('Assets'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImageFromAssets();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+          _selectedAssetImage = null;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error picking image: $e")),
+      );
+    }
+  }
+
+  Future<void> _pickImageFromAssets() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Choose from Assets'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: GridView.builder(
+            shrinkWrap: true,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemCount: _assetImages.length,
+            itemBuilder: (context, index) {
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedAssetImage = _assetImages[index];
+                    _selectedImage = null;
+                  });
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      _assetImages[index],
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveRoom() async {
-    if (_roomNameController.text.isEmpty) return;
+    if (_roomNameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter room name")),
+      );
+      return;
+    }
+    
     setState(() => _isLoading = true);
 
     try {
       final headers = await _getAuthHeaders();
+      
+      // Convert image to base64 if selected
+      String? imageBase64;
+      if (_selectedImage != null) {
+        // From gallery
+        final bytes = await _selectedImage!.readAsBytes();
+        imageBase64 = base64Encode(bytes);
+      } else if (_selectedAssetImage != null) {
+        // From assets
+        final ByteData data = await rootBundle.load(_selectedAssetImage!);
+        final Uint8List bytes = data.buffer.asUint8List();
+        imageBase64 = base64Encode(bytes);
+      }
+      
       final response = await http.post(
         Uri.parse('$baseUrl/rooms'),
         headers: headers,
@@ -56,7 +193,7 @@ class _StaffAddRoomPageState extends State<StaffAddRoomPage> {
           "description": _descriptionController.text,
           "capacity": int.tryParse(_capacityController.text) ?? 1,
           "is_available": true,
-          "image": "assets/images/Room1.jpg"
+          "image": imageBase64
         }),
       );
 
@@ -126,15 +263,42 @@ class _StaffAddRoomPageState extends State<StaffAddRoomPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Container(
-              height: 180,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey)),
-              child: const Center(
-                  child: Icon(Icons.add_a_photo, size: 40, color: Colors.grey)),
+            GestureDetector(
+              onTap: _showImageSourceDialog,
+              child: Container(
+                height: 180,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey)),
+                child: _selectedImage != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          _selectedImage!,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : _selectedAssetImage != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.asset(
+                              _selectedAssetImage!,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_a_photo, size: 40, color: Colors.grey),
+                                SizedBox(height: 8),
+                                Text('Tap to select image', style: TextStyle(color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+              ),
             ),
             const SizedBox(height: 20),
             TextField(

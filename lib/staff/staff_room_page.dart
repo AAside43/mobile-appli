@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import '../login_page.dart';
@@ -135,6 +136,44 @@ class _StaffRoomPageState extends State<StaffRoomPage> {
     }
   }
 
+  Widget _buildRoomImage(dynamic imageData) {
+    if (imageData != null && imageData is String && imageData.isNotEmpty) {
+      try {
+        // Decode base64 image
+        Uint8List bytes = base64Decode(imageData);
+        return Image.memory(
+          bytes,
+          height: 100,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return _defaultRoomImage();
+          },
+        );
+      } catch (e) {
+        return _defaultRoomImage();
+      }
+    }
+    return _defaultRoomImage();
+  }
+
+  Widget _defaultRoomImage() {
+    return Image.asset(
+      "assets/images/Room1.jpg",
+      height: 100,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          height: 100,
+          width: double.infinity,
+          color: Colors.grey[300],
+          child: const Icon(Icons.meeting_room, size: 40, color: Colors.grey),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -214,12 +253,7 @@ class _StaffRoomPageState extends State<StaffRoomPage> {
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Image.asset(
-                                    item["image"] ?? "assets/images/Room1.jpg",
-                                    height: 100,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                  ),
+                                  child: _buildRoomImage(item["image"]),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(item["name"] ?? "Room",
