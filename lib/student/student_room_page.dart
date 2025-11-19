@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import '../login_page.dart';
@@ -41,37 +42,8 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
     '15:00-17:00',
   ];
 
-  // ตารางห้องแบบ Static เพื่อจำสถานะข้ามหน้า
-  static List<Map<String, dynamic>> rooms = [
-    {
-      "name": "Room 1",
-      "status": ["Free", "Free", "Free", "Free"]
-    },
-    {
-      "name": "Room 2",
-      "status": ["Free", "Free", "Free", "Free"]
-    },
-    {
-      "name": "Room 3",
-      "status": ["Disabled", "Disabled", "Disabled", "Disabled"]
-    },
-    {
-      "name": "Room 4",
-      "status": ["Free", "Free", "Free", "Free"]
-    },
-    {
-      "name": "Study room",
-      "status": ["Free", "Free", "Free", "Free"]
-    },
-    {
-      "name": "meeting room",
-      "status": ["Free", "Free", "Free", "Free"]
-    },
-    {
-      "name": "entertaining space",
-      "status": ["Disable", "Disable", "Disable", "Disable"]
-    },
-  ];
+  // ตารางห้อง - โหลดจาก database เท่านั้น
+  static List<Map<String, dynamic>> rooms = [];
 
   @override
   void initState() {
@@ -144,12 +116,15 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         List<dynamic> roomsData = data['rooms'];
-        // Update static rooms with database data
+        // Update static rooms with database data including image
         rooms = roomsData.map((room) {
           return {
             "room_id": room['room_id'].toString(),
             "name": room['name'],
+            "capacity": room['capacity']?.toString() ?? 'N/A',
+            "description": room['description'] ?? '',
             "is_available": room['is_available'] == 1,
+            "image": room['image'], // Store base64 image or null
             "status": ["Free", "Free", "Free", "Free"]
           };
         }).toList();
@@ -189,9 +164,12 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
         final DateTime today = DateTime.now();
         _hasActiveBooking = false;
 
-        // รีเซ็ตสถานะห้องทั้งหมดเป็น Free ก่อน
+        // รีเซ็ตสถานะห้องทั้งหมด - ใช้ is_available จาก database
         for (var room in rooms) {
-          room['status'] = ["Free", "Free", "Free", "Free"];
+          bool isAvailable = room['is_available'] == true;
+          room['status'] = isAvailable 
+            ? ["Free", "Free", "Free", "Free"]
+            : ["Disabled", "Disabled", "Disabled", "Disabled"];
         }
 
         for (var booking in bookingsData) {
@@ -220,13 +198,17 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
           }
           for (var room in rooms) {
             if (room['room_id']?.toString() == roomId) {
-              List<String> statusList =
-                  List<String>.from(room['status'] as List);
-              final int timeIndex = timeSlots.indexOf(timeSlot);
-              if (timeIndex != -1) {
-                statusList[timeIndex] =
-                    status == 'Pending' ? 'Pending' : 'Reserved';
-                room['status'] = statusList;
+              // Only update status if room is available (not disabled)
+              bool isAvailable = room['is_available'] == true;
+              if (isAvailable) {
+                List<String> statusList =
+                    List<String>.from(room['status'] as List);
+                final int timeIndex = timeSlots.indexOf(timeSlot);
+                if (timeIndex != -1) {
+                  statusList[timeIndex] =
+                      status == 'Pending' ? 'Pending' : 'Reserved';
+                  room['status'] = statusList;
+                }
               }
               break;
             }
@@ -498,36 +480,7 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
   // ฟังก์ชัน static สำหรับใช้รีเซ็ตข้อมูลจากหน้าอื่น (ไม่ต้อง setState)
   static void _resetStatic() {
     _bookingHistory.clear();
-    rooms = [
-      {
-        "name": "Room 1",
-        "status": ["Free", "Free", "Free", "Free"]
-      },
-      {
-        "name": "Room 2",
-        "status": ["Free", "Free", "Free", "Free"]
-      },
-      {
-        "name": "Room 3",
-        "status": ["Free", "Free", "Free", "Free"]
-      },
-      {
-        "name": "Room 4",
-        "status": ["Free", "Free", "Free", "Free"]
-      },
-      {
-        "name": "Study room",
-        "status": ["Free", "Free", "Free", "Free"]
-      },
-      {
-        "name": "meeting room",
-        "status": ["Free", "Free", "Free", "Free"]
-      },
-      {
-        "name": "entertaining space",
-        "status": ["Disable", "Disable", "Disable", "Disable"]
-      },
-    ];
+    rooms = []; // Clear rooms - will be reloaded from database
   }
 
   @override
@@ -723,11 +676,30 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
               Expanded(
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : ListView.builder(
-                        itemCount: rooms.length,
-                        itemBuilder: (context, roomIndex) {
-                          final room = rooms[roomIndex];
-                          return Padding(
+                    : rooms.isEmpty
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.meeting_room_outlined, size: 80, color: Colors.grey),
+                                SizedBox(height: 16),
+                                Text(
+                                  'No rooms available',
+                                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  'Please check back later',
+                                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: rooms.length,
+                            itemBuilder: (context, roomIndex) {
+                              final room = rooms[roomIndex];
+                              return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Row(
                               children: [

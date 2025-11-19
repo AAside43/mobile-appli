@@ -328,15 +328,18 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-                color: Colors.black26,
-                blurRadius: 8,
-                offset: const Offset(0, -2)),
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
           ],
         ),
         child: BottomNavigationBar(
           currentIndex: 3,
+          type: BottomNavigationBarType.fixed,
           selectedItemColor: const Color(0xFFFFA726),
           unselectedItemColor: Colors.black54,
+          showUnselectedLabels: true,
           onTap: (index) {
             if (index == 0) {
               Navigator.pushReplacement(context,
@@ -347,7 +350,9 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
             } else if (index == 2) {
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const StudentCheckPage()));
-            } else if (index == 3) {}
+            } else if (index == 3) {
+              // Already on History, do nothing
+            }
           },
           items: [
             const BottomNavigationBarItem(
