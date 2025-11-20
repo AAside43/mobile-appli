@@ -5,23 +5,53 @@ const con = db; // `db` is the connection object; db.connect() is available to w
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+<<<<<<< HEAD
 const secretKey = process.env.JWT_SECRET || 'My_Secret_Key_1234';
 
 // FRONTEND / BACKEND
 // FRONTEND: Flutter app (in ./lib/) calls these HTTP endpoints.
 // BACKEND: This file implements the API (Express + MySQL). Keep comments short.
+=======
+const secretKey = 'My_Secret_Key_1234';
+const os = require('os');
+>>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645
 
 
 // Middleware
 app.use(cors({
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type"],
+    allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 // Allow cross-origin requests from Flutter app
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increase body size limit for image uploads (50MB)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Helper function to get local IP address
+function getLocalIPAddress() {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            // Skip internal (loopback) and non-IPv4 addresses
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+    return '0.0.0.0';
+}
+
+// Get server IP endpoint (for auto-configuration)
+app.get('/server-ip', (req, res) => {
+    const localIP = getLocalIPAddress();
+    res.json({
+        ip: localIP,
+        port: PORT,
+        url: `http://${localIP}:${PORT}`
+    });
+});
 
 // --- Auth middleware (JWT) ---
 function authenticateToken(req, res, next) {
@@ -107,12 +137,16 @@ app.get('/me', authenticateToken, (req, res) => {
 
 // Public (used by frontend): test/discovery endpoint
 app.get('/', (req, res) => {
+    const localIP = getLocalIPAddress();
     res.json({
         message: 'Mobile App Server is running!',
         database: 'mobi_app',
         server: 'Connected to mobi_app MySQL database',
+        serverIP: localIP,
+        serverURL: `http://${localIP}:${PORT}`,
         endpoints: [
             'GET / - This test endpoint',
+            'GET /server-ip - Get server IP address',
             'GET /test-db - Test database connection',
             'POST /init-db - Initialize database from mobi_app.sql',
             'POST /login - User authentication',
@@ -323,7 +357,7 @@ app.get('/user/:id', (req, res) => {
  * Response: { message, rooms }
  */
 app.get('/rooms', (_req, res) => {
-    const sql = "SELECT r.room_id, r.name, r.description, r.capacity, r.is_available FROM rooms r ORDER BY r.room_id";
+    const sql = "SELECT r.room_id, r.name, r.description, r.capacity, r.is_available, r.image FROM rooms r ORDER BY r.room_id";
     con.query(sql, function (err, results) {
         if (err) {
             console.error('Database error:', err);
@@ -336,6 +370,7 @@ app.get('/rooms', (_req, res) => {
     })
 });
 
+<<<<<<< HEAD
 // STAFF-ONLY (backend): room management endpoints — called by staff UI only
 // Requires Authorization: Bearer <token> (role must be 'staff')
 /**
@@ -419,6 +454,118 @@ app.delete('/staff/rooms/:id', authenticateToken, authorizeRole('staff'), (req, 
         // notify SSE subscribers about room deletion
         broadcastEvent('room_changed', { action: 'deleted', roomId: Number(roomId) });
     });
+=======
+// Add new room (for staff)
+app.post('/rooms', (req, res) => {
+    const { name, description, capacity, is_available, image } = req.body;
+
+    // Validate required fields
+    if (!name || !capacity) {
+        return res.status(400).json({ error: "Name and capacity are required" });
+    }
+
+    // Convert boolean to integer for database
+    const availableValue = is_available ? 1 : 0;
+
+    // If image is provided as base64, store it; otherwise use null
+    const sql = "INSERT INTO rooms (name, description, capacity, is_available, image) VALUES (?, ?, ?, ?, ?)";
+    const values = [
+        name,
+        description || '',
+        parseInt(capacity) || 1,
+        availableValue,
+        image || null
+    ];
+
+    con.query(sql, values, function (err, result) {
+        if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: "Database server error", details: err.message });
+        }
+
+        res.status(201).json({
+            message: "Room added successfully",
+            roomId: result.insertId
+        });
+    });
+});
+
+// Update room (for staff to edit room details including image)
+app.put('/rooms/:id', (req, res) => {
+    const roomId = req.params.id;
+    const { name, description, capacity, is_available, image } = req.body;
+
+    // Check if it's a status-only update (for toggle switch)
+    if (is_available !== undefined && !name && !description && !capacity) {
+        // Status-only update
+        const availableValue = is_available ? 1 : 0;
+        const sql = "UPDATE rooms SET is_available = ? WHERE room_id = ?";
+        con.query(sql, [availableValue, roomId], function (err, result) {
+            if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: "Database server error" });
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: "Room not found" });
+            }
+
+            res.json({
+                message: "Room status updated successfully",
+                roomId: roomId,
+                is_available: availableValue
+            });
+        });
+    } else {
+        // Full room update (including image)
+        const updates = [];
+        const values = [];
+
+        if (name !== undefined) {
+            updates.push("name = ?");
+            values.push(name);
+        }
+        if (description !== undefined) {
+            updates.push("description = ?");
+            values.push(description);
+        }
+        if (capacity !== undefined) {
+            updates.push("capacity = ?");
+            values.push(parseInt(capacity));
+        }
+        if (is_available !== undefined) {
+            updates.push("is_available = ?");
+            values.push(is_available ? 1 : 0);
+        }
+        if (image !== undefined) {
+            updates.push("image = ?");
+            values.push(image);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: "No fields to update" });
+        }
+
+        values.push(roomId);
+        const sql = `UPDATE rooms SET ${updates.join(', ')} WHERE room_id = ?`;
+
+        con.query(sql, values, function (err, result) {
+            if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: "Database server error", details: err.message });
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: "Room not found" });
+            }
+
+            res.json({
+                message: "Room updated successfully",
+                roomId: roomId
+            });
+        });
+    }
+>>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645
 });
 
 // --- ⬇️ NEW/MODIFIED ENDPOINTS BASED ON REQUIREMENTS ⬇️ ---
@@ -817,6 +964,7 @@ app.delete('/booking/:id', (req, res) => {
 // Start server after DB connection succeeds
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0'; // Listen on all network interfaces
+<<<<<<< HEAD
 
 // Start server and attempt DB connection; if DB is unavailable, start the
 // HTTP server so mobile emulator can still reach endpoints (they will return
@@ -852,3 +1000,15 @@ async function attemptDbConnect(retryIntervalSeconds = 10) {
 
 startHttpServer();
 attemptDbConnect();
+=======
+app.listen(PORT, HOST, () => {
+    const localIP = getLocalIPAddress();
+    console.log(`🚀 Mobile app Server running on ${HOST}:${PORT}`);
+    console.log("📁 Connected to 'mobi_app' MySQL database");
+    console.log(`🌐 Local Network: http://${localIP}:${PORT}`);
+    console.log(`🌐 Localhost: http://localhost:${PORT}`);
+    console.log(`🌐 Android Emulator: http://10.0.2.2:${PORT}`);
+    console.log(`📱 Use this URL in your Flutter app: http://${localIP}:${PORT}`);
+    console.log(`🔍 Get server IP: http://${localIP}:${PORT}/server-ip`);
+});
+>>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645

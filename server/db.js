@@ -17,6 +17,7 @@ const con = mysql.createConnection({
     multipleStatements: true // Allow multiple SQL statements
 });
 
+<<<<<<< HEAD
 // Expose a connect function that returns a Promise so callers can wait for DB readiness
 function connect() {
     return new Promise((resolve, reject) => {
@@ -31,6 +32,30 @@ function connect() {
                         password: DB_PASSWORD,
                         multipleStatements: true
                     });
+=======
+// Test the connection
+con.connect(function(err) {
+    if (err) {
+        console.error('Error connecting to mobi_app database: ' + err.stack);
+        return;
+    }
+    console.log('Connected to mobi_app database as id ' + con.threadId);
+    
+    // Auto-migrate: Add image column if it doesn't exist
+    const addImageColumn = `
+        ALTER TABLE rooms 
+        ADD COLUMN IF NOT EXISTS image LONGTEXT
+    `;
+    
+    con.query(addImageColumn, function(err) {
+        if (err && !err.message.includes('Duplicate column')) {
+            console.warn('Note: Image column migration skipped or already exists');
+        } else {
+            console.log('✅ Database schema updated: image column added to rooms table');
+        }
+    });
+});
+>>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645
 
                     const createSql = `CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`;
                     tmp.query(createSql, (createErr) => {

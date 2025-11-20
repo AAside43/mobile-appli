@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import '../login_page.dart';
@@ -77,6 +78,7 @@ class _StaffRoomPageState extends State<StaffRoomPage> {
     final room = roomList[index];
     final roomId = room['room_id'];
 
+    // Optimistically update UI
     setState(() {
       roomList[index]['is_available'] = currentValue ? 1 : 0;
     });
@@ -87,24 +89,89 @@ class _StaffRoomPageState extends State<StaffRoomPage> {
         Uri.parse('$baseUrl/rooms/$roomId'),
         headers: headers,
         body: json.encode({
-          ...room,
           "is_available": currentValue,
-          "status": currentValue ? "available" : "disabled"
         }),
       );
 
-      if (response.statusCode != 200) {
+      if (response.statusCode == 200) {
+        // Success - show confirmation
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(currentValue 
+                ? "Room enabled successfully" 
+                : "Room disabled successfully"),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // Revert on failure
         setState(() {
           roomList[index]['is_available'] = !currentValue ? 1 : 0;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Failed to update status")));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Failed to update room status"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
+      // Revert on error
       setState(() {
         roomList[index]['is_available'] = !currentValue ? 1 : 0;
       });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error: ${e.toString()}"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  Widget _buildRoomImage(dynamic imageData) {
+    if (imageData != null && imageData is String && imageData.isNotEmpty) {
+      try {
+        // Decode base64 image
+        Uint8List bytes = base64Decode(imageData);
+        return Image.memory(
+          bytes,
+          height: 100,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return _defaultRoomImage();
+          },
+        );
+      } catch (e) {
+        return _defaultRoomImage();
+      }
+    }
+    return _defaultRoomImage();
+  }
+
+  Widget _defaultRoomImage() {
+    return Image.asset(
+      "assets/images/Room1.jpg",
+      height: 100,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          height: 100,
+          width: double.infinity,
+          color: Colors.grey[300],
+          child: const Icon(Icons.meeting_room, size: 40, color: Colors.grey),
+        );
+      },
+    );
   }
 
   @override
@@ -186,12 +253,7 @@ class _StaffRoomPageState extends State<StaffRoomPage> {
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Image.asset(
-                                    item["image"] ?? "assets/images/Room1.jpg",
-                                    height: 100,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                  ),
+                                  child: _buildRoomImage(item["image"]),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(item["name"] ?? "Room",
