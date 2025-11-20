@@ -500,49 +500,78 @@ app.put('/rooms/:id', (req, res) => {
 /**
  * GET /dashboard/stats
  * Lecturer/Staff. Return aggregated counts for dashboard (pending/reserved/disabled/free slots).
+ * Now includes time-based disabled slots (past time slots are counted as disabled).
  * Response: { pending_slots, reserved_slots, disabled_rooms, free_slots }
  */
 app.get('/dashboard/stats', async (req, res) => {
-    // กำหนดว่ามี 4 slots ต่อห้อง
-    const SLOTS_PER_ROOM = 4;
+    const TIME_SLOTS = [
+        { start: '08:00', end: '10:00' },
+        { start: '10:00', end: '12:00' },
+        { start: '13:00', end: '15:00' },
+        { start: '15:00', end: '17:00' }
+    ];
 
     try {
-        // 1. ดึงข้อมูลที่จำเป็นทั้งหมดพร้อมกัน
+        // Get current date and time
+        const now = new Date();
+        const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+
+        // Helper function to check if time has passed
+        const hasTimePassed = (endTime) => {
+            const [endHour, endMinute] = endTime.split(':').map(Number);
+            if (currentHour > endHour) return true;
+            if (currentHour === endHour && currentMinute >= endMinute) return true;
+            return false;
+        };
+
+        // 1. Get all data in parallel
         const [
             [disabledRoomsResult],
             [availableRoomsResult],
             [pendingSlotsResult],
             [reservedSlotsResult]
         ] = await Promise.all([
-            // 1. นับ "Disabled Rooms" (ตามที่คุณขอ)
+            // 1. Count physically disabled rooms
             con.promise().query("SELECT COUNT(*) as count FROM rooms WHERE is_available = 0"),
 
-            // 2. นับ "Available Rooms" (ห้องที่เปิดใช้งาน)
+            // 2. Count available rooms
             con.promise().query("SELECT COUNT(*) as count FROM rooms WHERE is_available = 1"),
 
-            // 3. นับ "Pending Slots" (ของวันนี้)
-            con.promise().query("SELECT COUNT(*) as count FROM bookings WHERE status = 'pending' AND booking_date = CURDATE()"),
+            // 3. Count pending slots for today
+            con.promise().query("SELECT COUNT(*) as count FROM bookings WHERE status = 'pending' AND DATE(booking_date) = CURDATE()"),
 
-            // 4. นับ "Reserved Slots" (ของวันนี้)
-            con.promise().query("SELECT COUNT(*) as count FROM bookings WHERE status = 'approved' AND booking_date = CURDATE()")
+            // 4. Count reserved slots for today
+            con.promise().query("SELECT COUNT(*) as count FROM bookings WHERE status = 'approved' AND DATE(booking_date) = CURDATE()")
         ]);
 
-        // 2. แยกตัวแปร
         const disabledRoomCount = disabledRoomsResult[0].count;
         const availableRoomCount = availableRoomsResult[0].count;
         const pendingSlotCount = pendingSlotsResult[0].count;
         const reservedSlotCount = reservedSlotsResult[0].count;
 
-        // 3. คำนวณ "Free Slots"
-        const totalFreeSlots = (availableRoomCount * SLOTS_PER_ROOM) - pendingSlotCount - reservedSlotCount;
+        // 2. Calculate time-based disabled slots
+        let timeBasedDisabledSlots = 0;
+        for (const slot of TIME_SLOTS) {
+            if (hasTimePassed(slot.end)) {
+                // Each passed time slot affects all available rooms
+                timeBasedDisabledSlots += availableRoomCount;
+            }
+        }
 
-        // 4. ส่งข้อมูลกลับไป (ใช้ Key เหล่านี้เท่านั้น!)
+        // 3. Calculate stats
+        const totalSlots = availableRoomCount * TIME_SLOTS.length;
+        const totalDisabledSlots = (disabledRoomCount * TIME_SLOTS.length) + timeBasedDisabledSlots;
+        const totalFreeSlots = totalSlots - pendingSlotCount - reservedSlotCount - timeBasedDisabledSlots;
+
+        // 4. Send response
         res.json({
             message: "Dashboard stats retrieved",
             pending_slots: pendingSlotCount,
             reserved_slots: reservedSlotCount,
-            disabled_rooms: disabledRoomCount, 
-            free_slots: totalFreeSlots       
+            disabled_rooms: Math.floor(totalDisabledSlots / TIME_SLOTS.length), // Convert slots to room count for display
+            free_slots: Math.max(0, totalFreeSlots) // Ensure non-negative
         });
 
     } catch (err) {
@@ -571,6 +600,27 @@ app.get('/rooms/slots', (req, res) => {
         con.query(bookingsSql, [requestedDate], (err, bookings) => {
             if (err) return res.status(500).json({ error: "DB error (bookings)" });
 
+            // Get current date and time for comparison
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const isToday = requestedDate === todayStr;
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            
+            // Function to check if time slot has passed
+            const hasTimePassed = (timeSlot) => {
+                if (!isToday) return false; // Future dates are always available
+                
+                // Extract end time from slot (e.g., "08:00-10:00" -> "10:00")
+                const endTime = timeSlot.split('-')[1];
+                const [endHour, endMinute] = endTime.split(':').map(Number);
+                
+                // Check if current time is past the slot end time
+                if (currentHour > endHour) return true;
+                if (currentHour === endHour && currentMinute > endMinute) return true;
+                return false;
+            };
+
             // สร้าง time slots ตามข้อกำหนด
             const timeSlotsTemplate = ["08:00-10:00", "10:00-12:00", "13:00-15:00", "15:00-17:00"];
 
@@ -579,6 +629,9 @@ app.get('/rooms/slots', (req, res) => {
                     let status = "free";
 
                     if (room.is_available === 0) {
+                        status = "disabled";
+                    } else if (hasTimePassed(slot)) {
+                        // Time slot has passed - disable it
                         status = "disabled";
                     } else {
                         // ค้นหาการจองสำหรับห้องนี้และสล็อตเวลานี้
@@ -784,6 +837,22 @@ app.post('/book-room', (req, res) => {
 
     if (!userId || !roomId || !booking_date || !time_slot) {
         return res.status(400).json({ error: 'User ID, Room ID, Booking Date, and Time Slot are required' });
+    }
+
+    // Check if time slot has already passed (only for today)
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    
+    if (booking_date === todayStr) {
+        const endTime = time_slot.split('-')[1]; // e.g., "10:00" from "08:00-10:00"
+        const [endHour, endMinute] = endTime.split(':').map(Number);
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        
+        // Check if current time is past the slot end time
+        if (currentHour > endHour || (currentHour === endHour && currentMinute > endMinute)) {
+            return res.status(400).json({ error: 'Cannot book past time slots. This time slot has already passed.' });
+        }
     }
 
     // 1. ตรวจสอบ "A student can only book a single slot in one day."

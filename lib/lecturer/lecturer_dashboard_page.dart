@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 import '../config.dart';
 import '../login_page.dart';
+import '../services/sse_service.dart';
 
 import 'lecturer_history_page.dart';
 import 'lecturer_room_page.dart';
@@ -27,12 +28,30 @@ class _LecturerDashboardPageState extends State<LecturerDashboardPage> {
   String _errorMessage = '';
   DateTime _now = DateTime.now();
   Timer? _clockTimer;
+  Timer? _statsRefreshTimer;
+  final SseService _sse = sseService;
 
   @override
   void initState() {
     super.initState();
     _fetchDashboardStats();
     _startClock();
+    _startStatsRefreshTimer();
+    _startSse();
+  }
+
+  void _startSse() async {
+    await _sse.connect();
+    _sse.events.listen((msg) {
+      final event = msg['event'];
+      if (event == 'booking_created' || 
+          event == 'booking_updated' || 
+          event == 'booking_cancelled' ||
+          event == 'room_changed') {
+        // Refresh dashboard stats on any booking or room change
+        _fetchDashboardStats();
+      }
+    });
   }
 
   void _startClock() {
@@ -44,9 +63,18 @@ class _LecturerDashboardPageState extends State<LecturerDashboardPage> {
     });
   }
 
+  void _startStatsRefreshTimer() {
+    _statsRefreshTimer?.cancel();
+    // Refresh stats every 60 seconds to update time-based disabled slots
+    _statsRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      _fetchDashboardStats();
+    });
+  }
+
   @override
   void dispose() {
     _clockTimer?.cancel();
+    _statsRefreshTimer?.cancel();
     super.dispose();
   }
 

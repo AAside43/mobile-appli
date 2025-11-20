@@ -26,6 +26,7 @@ class _StudentHomePageState extends State<StudentHomePage> {
   List<Map<String, dynamic>> rooms = [];
   DateTime _now = DateTime.now();
   Timer? _clockTimer;
+  Timer? _roomRefreshTimer; // Timer to refresh rooms every minute for time-based updates
   String? _role;
   final PageController _pageController = PageController();
   int _currentIndex = 0;
@@ -35,6 +36,7 @@ class _StudentHomePageState extends State<StudentHomePage> {
     super.initState();
     _loadRoomsFromServer();
     _startClock();
+    _startRoomRefreshTimer(); // Auto-refresh rooms every minute
     _loadRole();
     _startSse();
   }
@@ -60,6 +62,14 @@ class _StudentHomePageState extends State<StudentHomePage> {
       setState(() {
         _now = DateTime.now();
       });
+    });
+  }
+
+  void _startRoomRefreshTimer() {
+    _roomRefreshTimer?.cancel();
+    // Refresh rooms every 60 seconds to update time-based availability
+    _roomRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      _loadRoomsFromServer();
     });
   }
 
@@ -91,6 +101,7 @@ class _StudentHomePageState extends State<StudentHomePage> {
   @override
   void dispose() {
     _clockTimer?.cancel();
+    _roomRefreshTimer?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -136,13 +147,18 @@ class _StudentHomePageState extends State<StudentHomePage> {
     );
   }
 
-// 7. แก้ไข _loadRoomsFromServer ให้ส่ง Token
+// 7. แก้ไข _loadRoomsFromServer ให้ส่ง Token และดึงข้อมูล slots พร้อม time-based status
   Future<void> _loadRoomsFromServer() async {
     try {
       final headers = await _getAuthHeaders(); // ดึง Header ที่มี Token
 
+      // Get today's date
+      final now = DateTime.now();
+      final dateStr = DateFormat('yyyy-MM-dd').format(now);
+      final timestamp = now.millisecondsSinceEpoch;
+
       final response = await http.get(
-        Uri.parse('$baseUrl/rooms'), // ใช้ baseUrl
+        Uri.parse('$baseUrl/rooms/slots?date=$dateStr&_t=$timestamp'), // ใช้ /rooms/slots เพื่อดึง time-based status
         headers: headers, // ใส่ Header
       );
 
@@ -152,12 +168,19 @@ class _StudentHomePageState extends State<StudentHomePage> {
 
         setState(() {
           rooms = roomsData.map((room) {
+            // Check if any time slot is available (not disabled)
+            List<dynamic> timeSlots = room['time_slots'] ?? [];
+            bool hasAvailableSlot = timeSlots.any((slot) => 
+              slot['status'] != 'disabled'
+            );
+
             return {
               "room_id": room['room_id'].toString(),
               "name": room['name'],
               "capacity": "${room['capacity']} people",
               "description": room['description'] ?? '',
-              "is_available": room['is_available'] == 1,
+              "is_available": hasAvailableSlot, // Room available only if at least one slot is not disabled
+              "time_slots": timeSlots, // Store time slots for detailed view
               "image": _getDefaultImage(room['room_id'])
             };
           }).toList();
@@ -353,7 +376,12 @@ class _StudentHomePageState extends State<StudentHomePage> {
                                 ),
                               ],
                             ),
-                          )
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.refresh),
+                            onPressed: () => _loadRoomsFromServer(),
+                            tooltip: 'Refresh Rooms',
+                          ),
                         ],
                       ),
                     ),
