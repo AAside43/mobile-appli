@@ -553,17 +553,22 @@ app.get('/dashboard/stats', async (req, res) => {
 
 /**
  * GET /rooms/slots
- * Public/Lecturer. Return each room with today's time slots and slot status (free/pending/reserved/disabled).
- * Response: { message, rooms: [{ room_id, name, time_slots: [{time, status}] }] }
+ * Public/Lecturer. Return each room with time slots and slot status for a specific date (free/pending/reserved/disabled).
+ * Query params: ?date=YYYY-MM-DD (optional, defaults to today)
+ * Response: { message, date, rooms: [{ room_id, name, time_slots: [{time, status}] }] }
  */
 app.get('/rooms/slots', (req, res) => {
+    // Get date from query parameter or use current date
+    const requestedDate = req.query.date || new Date().toISOString().split('T')[0];
+    
     const roomsSql = "SELECT room_id, name, capacity, is_available FROM rooms";
-    // สมมติว่า 'bookings' มีคอลัมน์ 'booking_date' และ 'time_slot'
-    const bookingsSql = "SELECT room_id, time_slot, status FROM bookings WHERE booking_date = CURDATE() AND (status = 'pending' OR status = 'approved')";
+    // Query bookings for the specific date using DATE() to ignore timezone issues
+    // Only include pending and approved bookings (exclude rejected and cancelled)
+    const bookingsSql = "SELECT room_id, time_slot, status FROM bookings WHERE DATE(booking_date) = ? AND status IN ('pending', 'approved')";
 
     con.query(roomsSql, (err, rooms) => {
         if (err) return res.status(500).json({ error: "DB error (rooms)" });
-        con.query(bookingsSql, (err, bookings) => {
+        con.query(bookingsSql, [requestedDate], (err, bookings) => {
             if (err) return res.status(500).json({ error: "DB error (bookings)" });
 
             // สร้าง time slots ตามข้อกำหนด
@@ -599,7 +604,11 @@ app.get('/rooms/slots', (req, res) => {
                 };
             });
 
-            res.json({ message: "Rooms with time slots retrieved", rooms: results });
+            res.json({ 
+                message: "Rooms with time slots retrieved", 
+                date: requestedDate,
+                rooms: results 
+            });
         });
     });
 });

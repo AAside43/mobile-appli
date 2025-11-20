@@ -78,11 +78,11 @@ class _StudentHomePageState extends State<StudentHomePage> {
   String _rolePurpose() {
     switch (_role) {
       case 'student':
-        return 'Student — can book slots and view history.';
+        return 'Student — book rooms';
       case 'lecturer':
-        return 'Lecturer — review and approve booking requests.';
+        return 'Lecturer — approve requests';
       case 'staff':
-        return 'Staff — manage rooms (add/edit/delete) and view dashboard.';
+        return 'Staff — manage rooms';
       default:
         return _role == null ? 'Role: not set' : 'Role: $_role';
     }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'package:intl/intl.dart';
 import '../config.dart';
 import '../login_page.dart';
 
@@ -23,11 +25,29 @@ class _LecturerDashboardPageState extends State<LecturerDashboardPage> {
   Map<String, dynamic> _stats = {};
   bool _isLoading = true;
   String _errorMessage = '';
+  DateTime _now = DateTime.now();
+  Timer? _clockTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchDashboardStats();
+    _startClock();
+  }
+
+  void _startClock() {
+    _clockTimer?.cancel();
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      setState(() {
+        _now = DateTime.now();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    super.dispose();
   }
 
   // --- ฟังก์ชันระบบคงเดิม (JWT, Logout, API) ---
@@ -230,6 +250,56 @@ class _LecturerDashboardPageState extends State<LecturerDashboardPage> {
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
                     children: [
+                      // Real-time clock and role display
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF3E7BFA), width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today_outlined,
+                                color: Colors.black54),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                      DateFormat('EEE, MMM d, yyyy').format(_now),
+                                      style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600)),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(DateFormat('HH:mm:ss').format(_now),
+                                          style: const TextStyle(
+                                              color: Colors.black54)),
+                                      const Text('Lecturer — approve requests',
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black54)),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
                       // 1. Pending Room (สีเหลือง)
                       _buildStatCard(
                         "Pending room",

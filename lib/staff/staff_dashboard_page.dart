@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'package:intl/intl.dart';
 import '../config.dart';
 import '../login_page.dart';
 
@@ -26,11 +28,29 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
   ];
 
   bool _isLoading = true;
+  DateTime _now = DateTime.now();
+  Timer? _clockTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchDashboardStats();
+    _startClock();
+  }
+
+  void _startClock() {
+    _clockTimer?.cancel();
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      setState(() {
+        _now = DateTime.now();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _logout() async {
@@ -128,28 +148,81 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
-                  children: roomStatus.map((room) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
+                  children: [
+                    // Real-time clock and role display
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
                       padding: const EdgeInsets.all(16),
-                      width: double.infinity,
                       decoration: BoxDecoration(
-                        color: room["color"],
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(room["label"],
-                              style: const TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          Text(room["count"].toString(),
-                              style: const TextStyle(
-                                  fontSize: 28, fontWeight: FontWeight.bold)),
+                        border: Border.all(color: const Color(0xFF3E7BFA), width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
                         ],
                       ),
-                    );
-                  }).toList(),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today_outlined,
+                              color: Colors.black54),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                    DateFormat('EEE, MMM d, yyyy').format(_now),
+                                    style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(DateFormat('HH:mm:ss').format(_now),
+                                        style: const TextStyle(
+                                            color: Colors.black54)),
+                                    const Text('Staff — manage rooms',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.black54)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                    // Room status cards
+                    ...roomStatus.map((room) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: room["color"],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(room["label"],
+                                style: const TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            Text(room["count"].toString(),
+                                style: const TextStyle(
+                                    fontSize: 28, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ],
                 ),
               ),
             ),

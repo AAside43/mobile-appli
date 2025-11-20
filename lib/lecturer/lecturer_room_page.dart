@@ -25,6 +25,7 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
   bool _isLoading = true;
   String _errorMessage = '';
   String? _activeFilter;
+  DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
@@ -63,10 +64,12 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
 
     try {
       final headers = await _getAuthHeaders();
+      // Format date as YYYY-MM-DD for API
+      final dateStr = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
 
       final response = await http
           .get(
-        Uri.parse('$baseUrl/rooms/slots'),
+        Uri.parse('$baseUrl/rooms/slots?date=$dateStr'),
         headers: headers,
       )
           .timeout(
@@ -135,6 +138,14 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
     );
   }
 
+  String _formatDate(DateTime date) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -150,7 +161,13 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
         centerTitle: true,
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.black, size: 26),
+            tooltip: "Refresh",
+            onPressed: _fetchRoomSlots,
+          ),
+          IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.red, size: 26),
+            tooltip: "Logout",
             onPressed: () {
               showDialog(
                 context: context,
@@ -184,22 +201,35 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // (ส่วน Today: Oct 5, 2025 ยังคงเดิม)
+              // Date display (fixed to today, non-interactive)
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.black, width: 1.5),
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFF3E7BFA), width: 2),
                   borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                child: const Row(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.calendar_today_outlined,
-                        color: Colors.black54, size: 18),
-                    SizedBox(width: 8),
+                    const Icon(Icons.calendar_today_outlined,
+                        color: Color(0xFF3E7BFA), size: 18),
+                    const SizedBox(width: 8),
                     Text(
-                      "Today's Status",
-                      style: TextStyle(fontSize: 14, color: Colors.black87),
+                      "Today: ${_formatDate(_selectedDate)}",
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF3E7BFA),
+                      ),
                     ),
                   ],
                 ),
@@ -300,19 +330,51 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
                                         final List<dynamic> slots =
                                             room['time_slots'];
 
-                                        return Padding(
-                                          padding:
-                                              const EdgeInsets.only(bottom: 12),
+                                        return Container(
+                                          margin: const EdgeInsets.only(bottom: 12),
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: room['status'] == 'disabled'
+                                                ? Colors.grey.withOpacity(0.3)
+                                                : Colors.blue.withOpacity(0.2),
+                                              width: 1.5,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.05),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
                                           child: Row(
                                             children: [
                                               // Room Name
                                               SizedBox(
                                                 width: 60,
-                                                child: Text(room["name"],
-                                                    style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 14)),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      room["name"],
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                    if (room['status'] == 'disabled')
+                                                      const Text(
+                                                        'Disabled',
+                                                        style: TextStyle(
+                                                          fontSize: 9,
+                                                          color: Colors.grey,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
                                               ),
                                               const SizedBox(width: 8),
                                               // Status Slots
@@ -345,37 +407,115 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
                                                     } else {
                                                       cellColor =
                                                           _getColor(status);
-                                                      displayText = status;
+                                                      displayText = status == 'free' 
+                                                          ? 'Free' 
+                                                          : status == 'reserved' 
+                                                              ? 'Busy' 
+                                                              : status == 'pending'
+                                                                  ? 'Pending'
+                                                                  : status;
                                                     }
 
                                                     return Expanded(
-                                                      child: Container(
-                                                        margin: const EdgeInsets
-                                                            .symmetric(
-                                                            horizontal: 2),
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                                vertical: 8),
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color: cellColor,
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(6),
-                                                        ),
-                                                        child: Text(
-                                                          displayText,
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                          style:
-                                                              const TextStyle(
-                                                                  color: Colors
-                                                                      .white,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w600,
-                                                                  fontSize: 11),
+                                                      child: GestureDetector(
+                                                        onTap: () {
+                                                          // Show slot details on tap
+                                                          if (status != '-') {
+                                                            showDialog(
+                                                              context: context,
+                                                              builder: (context) => AlertDialog(
+                                                                title: Text(
+                                                                  '${room["name"]} - ${slot["time"]}',
+                                                                  style: const TextStyle(
+                                                                    fontWeight: FontWeight.bold,
+                                                                  ),
+                                                                ),
+                                                                content: Column(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                                  children: [
+                                                                    Row(
+                                                                      children: [
+                                                                        Icon(
+                                                                          status == 'free' 
+                                                                            ? Icons.check_circle 
+                                                                            : status == 'reserved'
+                                                                                ? Icons.event_busy
+                                                                                : Icons.pending,
+                                                                          color: cellColor,
+                                                                        ),
+                                                                        const SizedBox(width: 8),
+                                                                        Text(
+                                                                          'Status: $displayText',
+                                                                          style: TextStyle(
+                                                                            fontWeight: FontWeight.bold,
+                                                                            color: cellColor,
+                                                                          ),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                                actions: [
+                                                                  TextButton(
+                                                                    onPressed: () => Navigator.pop(context),
+                                                                    child: const Text('Close'),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            );
+                                                          }
+                                                        },
+                                                        child: Container(
+                                                          margin: const EdgeInsets
+                                                              .symmetric(
+                                                              horizontal: 2),
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  vertical: 10,
+                                                                  horizontal: 4),
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color: cellColor,
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(6),
+                                                            border: Border.all(
+                                                              color: Colors.white,
+                                                              width: 1,
+                                                            ),
+                                                          ),
+                                                          child: Column(
+                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            children: [
+                                                              Icon(
+                                                                status == 'free' 
+                                                                  ? Icons.check_circle_outline 
+                                                                  : status == 'reserved'
+                                                                      ? Icons.cancel
+                                                                      : status == 'pending'
+                                                                          ? Icons.schedule
+                                                                          : Icons.block,
+                                                                color: Colors.white,
+                                                                size: 16,
+                                                              ),
+                                                              const SizedBox(height: 2),
+                                                              Text(
+                                                                displayText,
+                                                                textAlign:
+                                                                    TextAlign.center,
+                                                                style:
+                                                                    const TextStyle(
+                                                                        color: Colors
+                                                                            .white,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                        fontSize: 10),
+                                                              ),
+                                                            ],
+                                                          ),
                                                         ),
                                                       ),
                                                     );
