@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
@@ -10,82 +9,40 @@ import 'student_home_page.dart';
 import 'student_room_page.dart';
 import 'student_check_page.dart';
 import '../login_page.dart';
-import '../services/sse_service.dart';
-import '../widgets/skeleton.dart';
 
 class StudentHistoryPage extends StatefulWidget {
-  const StudentHistoryPage({Key? key}) : super(key: key);
+  const StudentHistoryPage({super.key});
 
   @override
   State<StudentHistoryPage> createState() => _StudentHistoryPageState();
 }
 
 class _StudentHistoryPageState extends State<StudentHistoryPage> {
-  // ใช้ baseUrl จาก config.dart
   final String baseUrl = apiBaseUrl;
 
-  List<Map<String, dynamic>> historyList = [];
+  List<dynamic> historyList = [];
   bool _isLoading = true;
-  String _userRole = "student"; // เพิ่มตัวแปรเก็บ Role
 
   @override
   void initState() {
     super.initState();
     _loadBookingHistory();
-    _sseSub = sseService.events.listen((msg) {
-      final event = msg['event'];
-      if (event == 'booking_created' || event == 'booking_updated') {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(event == 'booking_created'
-                  ? 'New booking created'
-                  : 'Booking updated'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-          _loadBookingHistory();
-        }
-      } else if (event == 'room_changed') {
-        if (mounted) _loadBookingHistory();
-      }
-    });
   }
 
-  StreamSubscription? _sseSub;
-
-  @override
-  void dispose() {
-    _sseSub?.cancel();
-    super.dispose();
-  }
-
-  // ฟังก์ชันสำหรับดึง Token มาสร้าง Headers
   Future<Map<String, String>> _getAuthHeaders() async {
     final prefs = await SharedPreferences.getInstance();
     final String? token = prefs.getString('token');
-
-    if (token == null) {
-      // ถ้าไม่มี Token (ไม่ควรเกิดขึ้น) ให้ส่งกลับไปหน้า Login
-      // เราใช้ context.mounted เพื่อความปลอดภัย แม้ว่าอาจจะต้องส่ง context เข้ามา
-      throw Exception('No token found');
-    }
-
+    if (token == null) throw Exception('No token found');
     return {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
     };
   }
 
-  // เพิ่มฟังก์ชัน _logout (เหมือนใน home_page)
   Future<void> _logout(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('token');
-    await prefs.remove('userId');
-    await prefs.remove('role');
-    await prefs.setBool('isLoggedIn', false);
-
-    if (!context.mounted) return;
+    await prefs.clear();
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -93,18 +50,24 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
     );
   }
 
-  // =============================
-  // LOAD HISTORY FROM SERVER
-  // =============================
+  String _getString(Map<dynamic, dynamic> data, List<String> keys,
+      {String fallback = "-"}) {
+    for (var key in keys) {
+      if (data[key] != null &&
+          data[key].toString().isNotEmpty &&
+          data[key].toString() != "null") {
+        return data[key].toString();
+      }
+    }
+    return fallback;
+  }
+
   Future<void> _loadBookingHistory() async {
     try {
-      // ดึง userId และ role จาก SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('userId');
-      final role = prefs.getString('role') ?? "student";
       if (userId == null) throw Exception('userId not found');
 
-      // เพิ่ม Headers และใช้ baseUrl
       final headers = await _getAuthHeaders();
       final response = await http.get(
         Uri.parse('$baseUrl/user/$userId/bookings'),
@@ -116,29 +79,47 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
         List<dynamic> list = data["bookings"];
 
         setState(() {
-          _userRole = role; // เก็บ role ไว้ใช้ใน UI
           historyList = list.map((b) {
+            String rawCap = _getString(b, ['capacity', 'room_capacity']);
+            String cap = rawCap
+                .replaceAll(RegExp(r'people', caseSensitive: false), '')
+                .trim();
+            String status = _getString(b, ['status'], fallback: 'Pending');
+
             return {
-              "booking_id": b["booking_id"].toString(),
-              "room": b["room_name"] ?? "Unknown room",
-              "room_id": b["room_id"]?.toString() ?? "",
-              "description": b["description"] ?? "",
-              "capacity": b["capacity"]?.toString() ?? "",
-              "time": b["time_slot"],
-              "date": b["booking_date"],
-              "reason": b["reason"] ?? "",
-              "status": b["status"] ?? "Pending",
-              "reservedBy": b["reserved"] ?? "-",
-              "approvedBy": b["approved"] ?? "-",
-              "rejection_reason": b["rejection_reason"] ?? "",
+              "booking_id": b["booking_id"],
+              "room": _getString(b, ['room_name', 'name', 'room']),
+              "capacity": cap.isEmpty ? "0" : cap,
+              "time": _getString(b, ['time_slot', 'time']),
+              "date": _getString(b, ['booking_date', 'date']),
+              "reason": _getString(b, ['reason', 'description']),
+              "status": status,
+              "reserved": _getString(b, ['reserved', 'reserved_by']),
+              "approved":
+                  _getString(b, ['approved', 'approved_by', 'approver']),
+              "rejection_reason":
+                  _getString(b, ['rejection_reason'], fallback: ""),
             };
+          }).where((item) {
+            // 🟢 กรองเอาเฉพาะสถานะที่ไม่ใช่ Pending
+            return item["status"].toString().toLowerCase() != 'pending';
           }).toList();
 
-          // sort: latest → oldest
+          // Sort Date descending
           historyList.sort((a, b) {
             try {
-              final da = DateFormat("MMM d, yyyy").parse(a["date"]);
-              final db = DateFormat("MMM d, yyyy").parse(b["date"]);
+              // ปรับ format ตามที่ API ส่งมา (ถ้าส่งเป็น YYYY-MM-DD ก็ใช้ได้เลย)
+              // แต่ถ้าส่งเป็น MMM d, yyyy ต้อง parse ให้ถูก
+              // Code นี้พยายาม parse แบบมาตรฐานก่อน
+              DateTime da, db;
+              try {
+                da = DateFormat("MMM d, yyyy").parse(a["date"]);
+                db = DateFormat("MMM d, yyyy").parse(b["date"]);
+              } catch (e) {
+                // fallback for ISO format
+                da = DateTime.parse(a["date"]);
+                db = DateTime.parse(b["date"]);
+              }
               return db.compareTo(da);
             } catch (_) {
               return 0;
@@ -148,232 +129,90 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
           _isLoading = false;
         });
       } else if (response.statusCode == 401) {
-        _logout(context);
+        if (mounted) _logout(context);
       } else {
-        print("❌ Server returned ${response.statusCode}");
-        _useLocalHistory();
+        setState(() => _isLoading = false);
       }
     } catch (e) {
-      print("❌ Error loading history: $e");
-      _useLocalHistory();
+      setState(() => _isLoading = false);
     }
   }
 
-  // Local fallback if server unreachable
-  void _useLocalHistory() {
-    final local = StudentRoomPage.getBookingHistory();
-    setState(() {
-      historyList = local;
-      _isLoading = false;
-    });
-  }
-
-  // =============================
-  // STATUS COLOR
-  // =============================
-  Color _statusColor(String s) {
-    s = s.toLowerCase();
-    if (s == "approved") return Colors.green;
-    if (s == "pending") return Colors.amber;
-    if (s == "rejected") return Colors.red;
-    if (s == "cancelled") return Colors.grey;
-    return Colors.black54;
+  Color _getStatusColor(String status) {
+    if (status == "Approved") return Colors.green;
+    if (status == "Rejected") return Colors.red;
+    if (status == "Cancelled") return Colors.grey;
+    return Colors.orange;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-
-      // =============================
-      // APP BAR
-      // =============================
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
         centerTitle: true,
-        title: const Text(
-          "History",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
+        title: const Text("History",
+            style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.red),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (dialogContext) => AlertDialog(
-                  title: const Text("Logout"),
-                  content: const Text("Are you sure you want to log out?"),
-                  actions: [
-                    TextButton(
-                      child: const Text("Cancel"),
-                      onPressed: () => Navigator.pop(dialogContext),
-                    ),
-                    TextButton(
-                      child: const Text("Logout",
-                          style: TextStyle(color: Colors.red)),
-                      onPressed: () {
-                        _logout(context);
-                      },
-                    ),
-                  ],
-                ),
-              );
-            },
+            onPressed: () => _logout(context),
           ),
         ],
       ),
-
-      // =============================
-      // BODY
-      // =============================
       body: _isLoading
-          ? Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: List.generate(4, (i) {
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
-                      boxShadow: const [
-                        BoxShadow(color: Colors.black12, blurRadius: 6)
-                      ],
-                    ),
-                    child: const Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  SkeletonBox(height: 14, width: 24),
-                                  SizedBox(width: 8),
-                                  SkeletonBox(height: 14, width: 120),
-                                ],
-                              ),
-                              SizedBox(height: 8),
-                              SkeletonBox(height: 12, width: 80),
-                              SizedBox(height: 6),
-                              SkeletonBox(height: 12),
-                            ],
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        SkeletonBox(height: 28, width: 60),
-                      ],
-                    ),
-                  );
-                }),
-              ),
-            )
-          : Padding(
-              padding: const EdgeInsets.all(16),
-              child: historyList.isEmpty
-                  ? const Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.history, size: 64, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text(
-                            "No history yet",
-                            style: TextStyle(color: Colors.grey, fontSize: 16),
+          ? const Center(child: CircularProgressIndicator())
+          : historyList.isEmpty
+              ? const Center(
+                  child: Text("No history yet",
+                      style: TextStyle(color: Colors.grey, fontSize: 16)))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: historyList.length,
+                  itemBuilder: (_, index) {
+                    final item = historyList[index];
+                    final String rejectionReason = item["rejection_reason"];
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: historyList.length,
-                      itemBuilder: (_, index) {
-                        final item = historyList[index];
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 14),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade200),
-                            boxShadow: const [
-                              BoxShadow(color: Colors.black12, blurRadius: 6),
-                            ],
-                          ),
-
-                          // =============================
-                          // CARD BODY
-                          // =============================
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Top Row
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // LEFT DETAILS
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.meeting_room,
-                                            color: Color(0xFF3E7BFA)),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          item["room"],
-                                          style: const TextStyle(
-                                              fontSize: 16,
-                                              color: Color(0xFF3E7BFA),
-                                              fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    if ((item["date"] ?? "").isNotEmpty)
-                                      Text("Date: ${item["date"]}"),
-                                    if ((item["time"] ?? "").isNotEmpty)
-                                      Text("Time: ${item["time"]}"),
-                                    if ((item["description"] ?? "").isNotEmpty)
-                                      Text(
-                                          "Description: ${item["description"]}"),
-                                    if ((item["reason"] ?? "").isNotEmpty)
-                                      Text("Reason: ${item["reason"]}"),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      "Booking ID: ${item["booking_id"]}",
-                                      style: const TextStyle(
-                                          fontSize: 12, color: Colors.black54),
-                                    ),
-                                    if (_userRole != "student") ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                          "Reserved by: ${item["reservedBy"]}"),
-                                      if ((item["approvedBy"] ?? "") != "")
-                                        Text(
-                                            "Approved by: ${item["approvedBy"]}"),
-                                      if ((item["rejection_reason"] ?? "")
-                                          .isNotEmpty)
-                                        Text(
-                                            "Rejection Reason: ${item["rejection_reason"]}"),
-                                    ]
-                                  ],
+                              Text(
+                                item["room"],
+                                style: const TextStyle(
+                                  color: Color(0xFF3E7BFA), // สีฟ้า
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-
-                              const SizedBox(width: 12),
-
-                              // STATUS BADGE
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: _statusColor(item["status"]),
-                                  borderRadius: BorderRadius.circular(8),
+                                  color: _getStatusColor(item["status"]),
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
                                   item["status"],
@@ -385,65 +224,103 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
                               ),
                             ],
                           ),
-                        );
-                      },
-                    ),
-            ),
+                          Text("${item['capacity']} People",
+                              style: const TextStyle(color: Colors.black54)),
+                          const SizedBox(height: 12),
 
-      // =============================
-      // BOTTOM NAV
-      // =============================
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
+                          // Details
+                          _buildInfoText("Date", item["date"]),
+                          _buildInfoText("Time", item["time"]),
+                          _buildInfoText("Reason", item["reason"]),
+                          _buildInfoText("Reserved by", item["reserved"]),
+                          _buildInfoText("Approved by", item["approved"]),
+
+                          // 🛑 SHOW REJECT REASON (IF EXISTS)
+                          if (item["status"] == "Rejected" &&
+                              rejectionReason.isNotEmpty &&
+                              rejectionReason != "-")
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                "Reject Reason : $rejectionReason",
+                                style: TextStyle(
+                                    color: Colors.red[700],
+                                    fontWeight: FontWeight.bold,
+                                    fontStyle: FontStyle.italic),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+      bottomNavigationBar: _buildBottomNavBar(context),
+    );
+  }
+
+  Widget _buildInfoText(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(color: Colors.black87, fontSize: 14),
+          children: [
+            TextSpan(
+                text: "$label : ",
+                style: const TextStyle(fontWeight: FontWeight.w500)),
+            TextSpan(
+                text: value, style: const TextStyle(color: Colors.black54)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavBar(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
               color: Colors.black.withOpacity(0.1),
               blurRadius: 8,
-              offset: const Offset(0, -2),
+              offset: const Offset(0, -2))
+        ],
+      ),
+      child: BottomNavigationBar(
+        currentIndex: 3,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: const Color(0xFFFFA726),
+        unselectedItemColor: Colors.black54,
+        onTap: (i) {
+          if (i == 3) return;
+          if (i == 0)
+            Navigator.pushReplacement(context,
+                MaterialPageRoute(builder: (_) => const StudentHomePage()));
+          else if (i == 1)
+            Navigator.pushReplacement(context,
+                MaterialPageRoute(builder: (_) => const StudentRoomPage()));
+          else if (i == 2)
+            Navigator.pushReplacement(context,
+                MaterialPageRoute(builder: (_) => const StudentCheckPage()));
+        },
+        items: [
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.home_filled), label: "Home"),
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.meeting_room_outlined), label: "Room"),
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.checklist_rtl), label: "Check Request"),
+          BottomNavigationBarItem(
+            icon: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(
+                  color: Color(0xFFFFA726), shape: BoxShape.circle),
+              child: const Icon(Icons.history, color: Colors.white),
             ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: 3,
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: const Color(0xFFFFA726),
-          unselectedItemColor: Colors.black54,
-          showUnselectedLabels: true,
-          onTap: (index) {
-            if (index == 0) {
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (_) => const StudentHomePage()));
-            } else if (index == 1) {
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (_) => const StudentRoomPage()));
-            } else if (index == 2) {
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (_) => const StudentCheckPage()));
-            } else if (index == 3) {
-              // Already on History, do nothing
-            }
-          },
-          items: [
-            const BottomNavigationBarItem(
-                icon: Icon(Icons.home_filled), label: "Home"),
-            const BottomNavigationBarItem(
-                icon: Icon(Icons.meeting_room_outlined), label: "Room"),
-            const BottomNavigationBarItem(
-                icon: Icon(Icons.checklist_rtl), label: "Check Request"),
-            BottomNavigationBarItem(
-              icon: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFFA726),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.history, color: Colors.white),
-              ),
-              label: "History",
-            ),
-          ],
-        ),
+            label: "History",
+          ),
+        ],
       ),
     );
   }
