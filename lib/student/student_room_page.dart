@@ -260,10 +260,19 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
         final DateTime today = DateTime.now();
         bool activeFound = false;
 
-        // Only check if current user has an active booking today (for booking limit)
+        // Reset room status first based on availability
+        for (var room in rooms) {
+          bool isAvailable = room['is_available'] == true;
+          room['status'] = isAvailable
+              ? ["Free", "Free", "Free", "Free"]
+              : ["Disabled", "Disabled", "Disabled", "Disabled"];
+        }
+
         for (var booking in bookingsData) {
           final String status = (booking['status'] ?? '').toString();
           final String dateStr = (booking['date'] ?? '').toString();
+          final String roomId = booking['room_id']?.toString() ?? '';
+          final String timeSlot = (booking['time'] ?? '').toString();
 
           DateTime? bookingDate;
           try {
@@ -281,9 +290,23 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
               bookingDate.year == today.year &&
               bookingDate.month == today.month &&
               bookingDate.day == today.day) {
+            // Only mark if Pending or Approved
             if (status == 'Pending' || status == 'Approved') {
               activeFound = true;
-              break;
+
+              // Update Slot Status
+              for (var room in rooms) {
+                if (room['room_id']?.toString() == roomId) {
+                  if (room['is_available'] == true) {
+                    int timeIndex = timeSlots.indexOf(timeSlot);
+                    if (timeIndex != -1) {
+                      room['status'][timeIndex] =
+                          (status == 'Pending') ? 'Pending' : 'Reserved';
+                    }
+                  }
+                  break;
+                }
+              }
             }
           }
         }
@@ -304,17 +327,45 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
   Color _getColor(String status) {
     switch (status) {
       case "Free":
-        return Colors.green;
+        return const Color(0xFF4CAF50); // Green
       case "Pending":
         return Colors.amber;
       case "Reserved":
-        return Colors.red;
+      case "Busy":
+        return const Color(0xFFF44336); // Red
       case "Disabled":
       case "Disable":
-        return Colors.grey;
+        return const Color(0xFF9E9E9E); // Grey
       default:
         return Colors.grey;
     }
+  }
+
+  IconData _getIcon(String status) {
+    switch (status) {
+      case "Free":
+        return Icons.check_circle_outline;
+      case "Pending":
+        return Icons.schedule;
+      case "Reserved":
+      case "Busy":
+        return Icons.cancel_outlined; // or Icons.highlight_off
+      case "Disabled":
+      case "Disable":
+        return Icons.block_outlined;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  String _getDisplayText(String status) {
+    if (status == "Reserved") return "Busy";
+    return status;
+  }
+
+  String _getDisplayText(String status) {
+    if (status == "Reserved") return "Busy";
+    return status;
   }
 
   void _showBookingDialog(String roomName, String timeSlot) {
@@ -374,23 +425,22 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
                   final dateStr =
                       DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-                  final response = await http.post(
-                      Uri.parse('$baseUrl/book-room'),
-                      headers: headers,
-                      body: json.encode({
-                        'userId': userId,
-                        'roomId':
-                            int.parse(roomId!), // Parse เป็น int ตาม backend
-                        'booking_date': dateStr,
-                        'time_slot': timeSlot,
-                        'reason': reason.isEmpty ? null : reason
-                      }));
+                  final response =
+                      await http.post(Uri.parse('$baseUrl/book-room'),
+                          headers: headers,
+                          body: json.encode({
+                            'userId': userId,
+                            'roomId': int.parse(roomId!),
+                            'booking_date': dateStr,
+                            'time_slot': timeSlot,
+                            'reason': reason.isEmpty ? null : reason
+                          }));
 
                   if (response.statusCode == 201) {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                         content: Text("✅ Booking sent!"),
                         backgroundColor: Colors.green));
-                    _loadAllData(); // Refresh UI
+                    _loadBookingsFromServer(); // Refresh UI
                   } else {
                     final err = json.decode(response.body);
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -412,25 +462,48 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
     );
   }
 
+  String _formatDate(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final String todayText = DateFormat('MMM d, yyyy').format(DateTime.now());
+    final DateTime now = DateTime.now();
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 1,
+        elevation: 0, // Flat style like image
         title: const Text("Room",
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 20)),
         centerTitle: true,
         actions: [
+          // Refresh Icon
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.black, size: 26),
-            tooltip: "Refresh",
+            icon: const Icon(Icons.refresh, color: Colors.black),
             onPressed: _loadAllData,
           ),
+          // Logout Icon (Exit style)
           IconButton(
-              icon: const Icon(Icons.logout, color: Colors.red),
+              icon: const Icon(Icons.logout_rounded, color: Colors.red),
               onPressed: () => _logout(context))
         ],
       ),
@@ -457,58 +530,88 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
                   ]),
                 ),
 
-              // Date Header
+              // Date Header (Blue Outline Button Style)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(8)),
-                child: Text("Today: $todayText",
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(height: 10),
-
-              // Header Row: Room and Time Slots (WITH BOX DESIGN)
-              Row(
-                children: [
-                  // "Room" header box
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.all(4), // ขอบ
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 8, horizontal: 4),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade400),
-                        borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                  border:
+                      Border.all(color: const Color(0xFF3E7BFA), width: 1.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.calendar_today_outlined,
+                        color: Color(0xFF3E7BFA), size: 20),
+                    const SizedBox(width: 10),
+                    Text(
+                      "Today: ${_formatDate(now)}",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF3E7BFA),
                       ),
-                      child: Center(
-                          child: Text("Room",
-                              style: TextStyle(fontWeight: FontWeight.bold))),
                     ),
-                  ),
-                  // Time slots header boxes
-                  ...timeSlots.map((t) => Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.all(4), // ขอบ
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 8, horizontal: 4),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade400),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                              child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(t,
-                                      style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold)))),
-                        ),
-                      )),
-                ],
+                  ],
+                ),
               ),
-              const Divider(),
+              const SizedBox(height: 16),
+
+              // Header Row: Room and Time Slots
+              SizedBox(
+                height: 50,
+                child: Row(
+                  children: [
+                    // "Room" header box
+                    Container(
+                      width: 70, // Fixed Width for Name
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(
+                        child: Text("Room",
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87)),
+                      ),
+                    ),
+                    // Time slots header boxes
+                    Expanded(
+                      child: Row(
+                        children: timeSlots
+                            .map((t) => Expanded(
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(
+                                        horizontal: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      border: Border.all(
+                                          color: Colors.grey.shade300),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Center(
+                                        child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(t,
+                                          style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87)),
+                                    )),
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
 
               // Rooms List
               Expanded(
@@ -520,46 +623,99 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
                             itemCount: rooms.length,
                             itemBuilder: (context, index) {
                               final room = rooms[index];
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: Colors
+                                          .blue.shade100), // Light Blue Border
+                                ),
                                 child: Row(
                                   children: [
+                                    // Room Name & Disabled Text
+                                    SizedBox(
+                                      width: 70, // Fixed Width to match header
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(room['name'],
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13)),
+                                          if (room['is_available'] == false)
+                                            const Text("Disabled",
+                                                style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.grey)),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    // Status Slots
                                     Expanded(
-                                        child: Text(room['name'],
-                                            textAlign: TextAlign.center,
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.bold))),
-                                    ...List.generate(room['status'].length,
-                                        (i) {
-                                      String status = room['status'][i];
-                                      bool isFree = status == "Free";
-                                      bool canBook =
-                                          isFree && !_hasActiveBooking;
+                                      child: Row(
+                                        children: List.generate(
+                                            room['status'].length, (i) {
+                                          String status = room['status'][i];
+                                          bool isFree = status == "Free";
+                                          bool canBook =
+                                              isFree && !_hasActiveBooking;
+                                          Color cellColor = _getColor(status);
+                                          IconData cellIcon = _getIcon(status);
+                                          String displayText =
+                                              _getDisplayText(status);
 
-                                      return Expanded(
-                                        child: GestureDetector(
-                                          onTap: canBook
-                                              ? () => _showBookingDialog(
-                                                  room['name'], timeSlots[i])
-                                              : null,
-                                          child: Container(
-                                            margin: const EdgeInsets.symmetric(
-                                                horizontal: 2),
-                                            height: 40,
-                                            decoration: BoxDecoration(
-                                                color: _getColor(status),
-                                                borderRadius:
-                                                    BorderRadius.circular(4)),
-                                            alignment: Alignment.center,
-                                            child: Text(status,
-                                                style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 10)),
-                                          ),
-                                        ),
-                                      );
-                                    })
+                                          return Expanded(
+                                            child: GestureDetector(
+                                              onTap: canBook
+                                                  ? () => _showBookingDialog(
+                                                      room['name'],
+                                                      timeSlots[i])
+                                                  : null,
+                                              child: Container(
+                                                margin:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 3),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        vertical: 8),
+                                                decoration: BoxDecoration(
+                                                  color: cellColor,
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
+                                                child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(cellIcon,
+                                                        color: Colors.white,
+                                                        size: 18),
+                                                    const SizedBox(height: 2),
+                                                    FittedBox(
+                                                      child: Text(displayText,
+                                                          style: const TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontSize: 10,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold)),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               );
