@@ -67,10 +67,19 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
       // Format date as YYYY-MM-DD for API
       final dateStr = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
 
+      // Add timestamp to prevent caching
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final requestHeaders = {
+        ...headers,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      };
+      
+      print('🔵 Fetching rooms for date: $dateStr (timestamp: $timestamp)');
       final response = await http
           .get(
-        Uri.parse('$baseUrl/rooms/slots?date=$dateStr'),
-        headers: headers,
+        Uri.parse('$baseUrl/rooms/slots?date=$dateStr&_t=$timestamp'),
+        headers: requestHeaders,
       )
           .timeout(
         const Duration(seconds: 8),
@@ -81,6 +90,10 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        print('🟢 Received ${data['rooms']?.length ?? 0} rooms');
+        if (data['rooms'] != null && data['rooms'].isNotEmpty) {
+          print('🟡 Room 4 data: ${data['rooms'].firstWhere((r) => r['room_id'] == 4, orElse: () => null)}');
+        }
         if (!mounted) return;
         setState(() {
           _rooms = data['rooms'];

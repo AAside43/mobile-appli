@@ -83,14 +83,24 @@ class _StaffRoomPageState extends State<StaffRoomPage> {
       final today = DateTime.now();
       final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
       
+      // Add timestamp to prevent caching
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final requestHeaders = {
+        ...headers,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      };
+      
+      print('🔵 [Staff] Fetching booking stats for date: $dateStr (timestamp: $timestamp)');
       final response = await http.get(
-        Uri.parse('$baseUrl/rooms/slots?date=$dateStr'),
-        headers: headers,
+        Uri.parse('$baseUrl/rooms/slots?date=$dateStr&_t=$timestamp'),
+        headers: requestHeaders,
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final rooms = data['rooms'] as List;
+        print('🟢 [Staff] Received ${rooms.length} rooms');
         
         Map<int, Map<String, int>> stats = {};
         

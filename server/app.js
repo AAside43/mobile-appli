@@ -604,6 +604,11 @@ app.get('/rooms/slots', (req, res) => {
                 };
             });
 
+            // Add cache control headers to prevent caching of room status
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            
             res.json({ 
                 message: "Rooms with time slots retrieved", 
                 date: requestedDate,
