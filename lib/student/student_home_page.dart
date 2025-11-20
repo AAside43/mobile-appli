@@ -464,12 +464,6 @@ class _StudentHomePageState extends State<StudentHomePage> {
           unselectedItemColor: Colors.black54,
           showUnselectedLabels: true,
           onTap: (index) {
-<<<<<<< HEAD
-            setState(() => _currentIndex = index);
-            _pageController.animateToPage(index,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut);
-=======
             if (index == 0) {
               // Already on Home, do nothing
             } else if (index == 1) {
@@ -482,7 +476,6 @@ class _StudentHomePageState extends State<StudentHomePage> {
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const StudentHistoryPage()));
             }
->>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645
           },
           items: [
             BottomNavigationBarItem(

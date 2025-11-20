@@ -394,20 +394,14 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
       // BOTTOM NAV
       // =============================
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-<<<<<<< HEAD
-                color: Colors.black26,
-                blurRadius: 8,
-                offset: Offset(0, -2)),
-=======
               color: Colors.black.withOpacity(0.1),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
->>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645
           ],
         ),
         child: BottomNavigationBar(

@@ -475,16 +475,10 @@ class _StudentCheckPageState extends State<StudentCheckPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-<<<<<<< HEAD
-                color: Colors.black.withAlpha((0.1 * 255).round()),
-                blurRadius: 8,
-                offset: const Offset(0, -2)),
-=======
               color: Colors.black.withOpacity(0.1),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
->>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645
           ],
         ),
         child: BottomNavigationBar(
@@ -501,19 +495,10 @@ class _StudentCheckPageState extends State<StudentCheckPage> {
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const StudentRoomPage()));
             } else if (index == 2) {
-<<<<<<< HEAD
-            } // current page
-            else if (index == 3) {
-              Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const StudentHistoryPage()));
-=======
               // Already on Check Request, do nothing
             } else if (index == 3) {
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const StudentHistoryPage()));
->>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645
             }
           },
           items: [

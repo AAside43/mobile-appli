@@ -5,17 +5,12 @@ const con = db; // `db` is the connection object; db.connect() is available to w
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-<<<<<<< HEAD
 const secretKey = process.env.JWT_SECRET || 'My_Secret_Key_1234';
+const os = require('os');
 
 // FRONTEND / BACKEND
 // FRONTEND: Flutter app (in ./lib/) calls these HTTP endpoints.
 // BACKEND: This file implements the API (Express + MySQL). Keep comments short.
-=======
-const secretKey = 'My_Secret_Key_1234';
-const os = require('os');
->>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645
-
 
 // Middleware
 app.use(cors({
@@ -378,91 +373,6 @@ app.get('/rooms', (_req, res) => {
     })
 });
 
-<<<<<<< HEAD
-// STAFF-ONLY (backend): room management endpoints — called by staff UI only
-// Requires Authorization: Bearer <token> (role must be 'staff')
-/**
- * POST /staff/rooms
- * Staff-only. Create a room.
- * Auth: Bearer token (role: staff)
- * Body: { name, description?, capacity, is_available? }
- */
-app.post('/staff/rooms', authenticateToken, authorizeRole('staff'), (req, res) => {
-    const { name, description, capacity, is_available } = req.body;
-
-    if (!name || typeof capacity === 'undefined') {
-        return res.status(400).json({ error: 'Missing required fields: name and capacity' });
-    }
-
-    const avail = (typeof is_available === 'undefined') ? 1 : (is_available ? 1 : 0);
-    const insertSql = 'INSERT INTO rooms (name, description, capacity, is_available) VALUES (?, ?, ?, ?)';
-    con.query(insertSql, [name, description || null, capacity, avail], (err, result) => {
-        if (err) {
-            console.error('DB error (insert room):', err);
-            return res.status(500).json({ error: 'Database error while adding room' });
-        }
-        const roomId = result.insertId;
-        res.status(201).json({ message: 'Room added', roomId });
-        // notify SSE subscribers about room creation
-        broadcastEvent('room_changed', { action: 'created', roomId, name, capacity, is_available: avail });
-    });
-});
-
-/**
- * PUT /staff/rooms/:id
- * Staff-only. Update room fields (partial allowed).
- * Auth: Bearer token (role: staff)
- * Body: any of { name, description, capacity, is_available }
- */
-app.put('/staff/rooms/:id', authenticateToken, authorizeRole('staff'), (req, res) => {
-    const roomId = req.params.id;
-    const { name, description, capacity, is_available } = req.body;
-
-    // Build dynamic update
-    const updates = [];
-    const params = [];
-    if (typeof name !== 'undefined') { updates.push('name = ?'); params.push(name); }
-    if (typeof description !== 'undefined') { updates.push('description = ?'); params.push(description); }
-    if (typeof capacity !== 'undefined') { updates.push('capacity = ?'); params.push(capacity); }
-    if (typeof is_available !== 'undefined') { updates.push('is_available = ?'); params.push(is_available ? 1 : 0); }
-
-    if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
-
-    const sql = `UPDATE rooms SET ${updates.join(', ')} WHERE room_id = ?`;
-    params.push(roomId);
-
-    con.query(sql, params, (err, result) => {
-        if (err) {
-            console.error('DB error (update room):', err);
-            return res.status(500).json({ error: 'Database error while updating room' });
-        }
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'Room not found' });
-        res.json({ message: 'Room updated', roomId: Number(roomId) });
-        // notify SSE subscribers about room update
-        broadcastEvent('room_changed', { action: 'updated', roomId: Number(roomId), updates: updates });
-    });
-});
-
-/**
- * DELETE /staff/rooms/:id
- * Staff-only. Delete a room by id.
- * Auth: Bearer token (role: staff)
- */
-app.delete('/staff/rooms/:id', authenticateToken, authorizeRole('staff'), (req, res) => {
-    const roomId = req.params.id;
-
-    const sql = 'DELETE FROM rooms WHERE room_id = ?';
-    con.query(sql, [roomId], (err, result) => {
-        if (err) {
-            console.error('DB error (delete room):', err);
-            return res.status(500).json({ error: 'Database error while deleting room' });
-        }
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'Room not found' });
-        res.json({ message: 'Room deleted', roomId: Number(roomId) });
-        // notify SSE subscribers about room deletion
-        broadcastEvent('room_changed', { action: 'deleted', roomId: Number(roomId) });
-    });
-=======
 // Add new room (for staff)
 app.post('/rooms', (req, res) => {
     const { name, description, capacity, is_available, image } = req.body;
@@ -573,7 +483,6 @@ app.put('/rooms/:id', (req, res) => {
             });
         });
     }
->>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645
 });
 
 // --- ⬇️ NEW/MODIFIED ENDPOINTS BASED ON REQUIREMENTS ⬇️ ---
@@ -969,9 +878,6 @@ app.delete('/booking/:id', (req, res) => {
 // --- ⬆️ END OF NEW/MODIFIED ENDPOINTS ⬆️ ---
 /* --- API ROUTES END --- */
 
-<<<<<<< HEAD
-// Start server after DB connection succeeds
-=======
 // Auto-update config.dart when IP changes
 let currentServerIP = getLocalIPAddress();
 
@@ -1001,46 +907,8 @@ function checkAndUpdateIP() {
 setInterval(checkAndUpdateIP, 15000);
 
 // Start server
->>>>>>> 38ab5c4cc580e83ff09441276d4d27a6840a14e1
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0'; // Listen on all network interfaces
-<<<<<<< HEAD
-
-// Start server and attempt DB connection; if DB is unavailable, start the
-// HTTP server so mobile emulator can still reach endpoints (they will return
-// DB errors for DB-backed routes). Meanwhile attempt DB reconnects in background.
-function startHttpServer() {
-    app.listen(PORT, HOST, () => {
-        console.log(`🚀 Mobile app Server running on ${HOST}:${PORT}`);
-        console.log(`🌐 Test the connection at: http://localhost:${PORT}`);
-        console.log(`🌐 Emulator can connect at: http://10.0.2.2:${PORT}`);
-        console.log(`🔍 Test database at: http://localhost:${PORT}/test-db`);
-    });
-}
-
-async function attemptDbConnect(retryIntervalSeconds = 10) {
-    try {
-        await db.ensureConnect();
-        console.log("📁 Connected to 'mobi_app' MySQL database");
-    } catch (err) {
-        console.error('Initial DB connection failed:', err.message || err);
-        console.log(`Will retry DB connection every ${retryIntervalSeconds}s`);
-        // Retry loop
-        const iv = setInterval(async () => {
-            try {
-                await db.ensureConnect();
-                console.log("📁 Reconnected to 'mobi_app' MySQL database");
-                clearInterval(iv);
-            } catch (e) {
-                console.warn('DB reconnect failed:', e.message || e);
-            }
-        }, retryIntervalSeconds * 1000);
-    }
-}
-
-startHttpServer();
-attemptDbConnect();
-=======
 app.listen(PORT, HOST, () => {
     const localIP = getLocalIPAddress();
     console.log(`🚀 Mobile app Server running on ${HOST}:${PORT}`);
@@ -1052,4 +920,3 @@ app.listen(PORT, HOST, () => {
     console.log(`🔍 Get server IP: http://${localIP}:${PORT}/server-ip`);
     console.log(`\n🔍 Monitoring network changes (checking every 15s)...`);
 });
->>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645

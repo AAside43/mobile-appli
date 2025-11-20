@@ -709,54 +709,6 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
               // LIST ROOMS
               Expanded(
                 child: _isLoading
-<<<<<<< HEAD
-                    ? SingleChildScrollView(
-                        physics: const NeverScrollableScrollPhysics(),
-                        child: Column(
-                          children: List.generate(4, (i) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: 60,
-                                    child: SkeletonBox(
-                                      height: 14,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: List.generate(4, (j) {
-                                        return Expanded(
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 2),
-                                            child: SkeletonBox(
-                                              height: 28,
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                            ),
-                                          ),
-                                        );
-                                      }),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: rooms.length,
-                        itemBuilder: (context, roomIndex) {
-                          final room = rooms[roomIndex];
-                          return Padding(
-=======
                     ? const Center(child: CircularProgressIndicator())
                     : rooms.isEmpty
                         ? const Center(
@@ -782,7 +734,6 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
                             itemBuilder: (context, roomIndex) {
                               final room = rooms[roomIndex];
                               return Padding(
->>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Row(
                               children: [

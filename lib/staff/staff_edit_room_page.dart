@@ -332,12 +332,6 @@ class _StaffEditRoomPageState extends State<StaffEditRoomPage> {
                 height: 180,
                 width: double.infinity,
                 decoration: BoxDecoration(
-<<<<<<< HEAD
-                    color: Colors.black.withAlpha((0.3 * 255).round()),
-                    borderRadius: BorderRadius.circular(12)),
-                child: const Center(
-                    child: Icon(Icons.edit, color: Colors.white, size: 40)),
-=======
                     color: Colors.grey[200],
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.grey)),
@@ -365,7 +359,6 @@ class _StaffEditRoomPageState extends State<StaffEditRoomPage> {
                     ),
                   ],
                 ),
->>>>>>> 799f64965b5f4f11c1671a1c22f4a0cfae077645
               ),
             ),
             const SizedBox(height: 20),
