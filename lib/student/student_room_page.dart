@@ -200,8 +200,8 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
           // Find matching room in our local rooms list
           for (var localRoom in rooms) {
             if (localRoom['room_id'].toString() == serverRoomId) {
-              // Update slot status from server data
-              final List<dynamic> slots = serverRoom['slots'] ?? [];
+              // Update slot status from server data - API returns 'time_slots' not 'slots'
+              final List<dynamic> slots = serverRoom['time_slots'] ?? [];
               List<String> newStatus = ["Free", "Free", "Free", "Free"];
               
               for (int i = 0; i < slots.length && i < timeSlots.length; i++) {
@@ -363,11 +363,6 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
     return status;
   }
 
-  String _getDisplayText(String status) {
-    if (status == "Reserved") return "Busy";
-    return status;
-  }
-
   void _showBookingDialog(String roomName, String timeSlot) {
     if (_hasActiveBooking) {
       showDialog(
@@ -440,7 +435,7 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                         content: Text("✅ Booking sent!"),
                         backgroundColor: Colors.green));
-                    _loadBookingsFromServer(); // Refresh UI
+                    _loadAllData(); // Refresh UI
                   } else {
                     final err = json.decode(response.body);
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(

@@ -672,15 +672,17 @@ app.get('/bookings/pending', (req, res) => {
 /**
  * GET /bookings/history
  * Lecturer/Staff. Return completed bookings (approved or rejected) for history view.
+ * Query params: ?approverId=X (optional) - filter by specific approver (lecturer)
  * Response: { message, bookings: [...] }
  */
 app.get('/bookings/history', (req, res) => {
-    // ดึงข้อมูลทั้งหมดที่ status ไม่ใช่ 'pending' หรือ 'cancelled'
-    const sql = `
+    const approverId = req.query.approverId; // Get lecturer ID from query parameter
+    
+    let sql = `
         SELECT
             b.booking_id, b.user_id, b.room_id, b.status,
             b.booking_date, b.time_slot, b.reason,
-            b.rejection_reason, 
+            b.rejection_reason, b.approver_id,
             r.name as room_name, r.description, r.capacity,
             u_student.name as reserved_by,
             u_approver.name as approved_by
@@ -689,10 +691,19 @@ app.get('/bookings/history', (req, res) => {
         JOIN users u_student ON b.user_id = u_student.user_id
         LEFT JOIN users u_approver ON b.approver_id = u_approver.user_id
         WHERE b.status IN ('approved', 'rejected')
-        ORDER BY b.booking_date DESC, b.time_slot DESC
     `;
+    
+    const params = [];
+    
+    // If approverId is provided, filter by that lecturer's actions only
+    if (approverId) {
+        sql += ` AND b.approver_id = ?`;
+        params.push(approverId);
+    }
+    
+    sql += ` ORDER BY b.booking_date DESC, b.time_slot DESC`;
 
-    con.query(sql, (err, results) => {
+    con.query(sql, params, (err, results) => {
         if (err) {
             console.error('Database error in /bookings/history:', err);
             return res.status(500).json({ error: "Database server error" });

@@ -80,11 +80,14 @@ class _LecturerHistoryPageState extends State<LecturerHistoryPage> {
 
     // --- เปลี่ยน API URL ตาม Role ---
     String apiUrl;
-    if (_isLecturerOrStaff) {
-      // ถ้าเป็น Lecturer/Staff, ดึงประวัติทั้งหมด (จาก API ใหม่)
+    if (_userRole == 'lecturer') {
+      // Lecturer sees only their own approved/rejected bookings
+      apiUrl = '$baseUrl/bookings/history?approverId=$_userId';
+    } else if (_userRole == 'staff') {
+      // Staff sees all history (no filter)
       apiUrl = '$baseUrl/bookings/history';
     } else {
-      // ถ้าเป็น Student, ดึงเฉพาะของตัวเอง (API เดิม)
+      // Student sees only their own bookings
       apiUrl = '$baseUrl/user/$_userId/bookings';
     }
 
