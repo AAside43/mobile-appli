@@ -6,7 +6,7 @@ echo.
 
 cd /d "%~dp0"
 
-echo [1/2] Updating IP configuration...
+echo [1/3] Updating IP configuration...
 node update-ip.js
 
 if %ERRORLEVEL% NEQ 0 (
@@ -17,6 +17,12 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo [2/2] Starting server...
+echo [2/3] Testing network connectivity...
+node test-connection.js
+
+echo.
+echo [3/3] Starting server on port 3000...
+echo.
+echo 💡 Tip: If other devices can't connect, run setup-firewall.bat as Administrator
 echo.
 node app.js

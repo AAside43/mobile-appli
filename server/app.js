@@ -12,17 +12,27 @@ const os = require('os');
 // FRONTEND: Flutter app (in ./lib/) calls these HTTP endpoints.
 // BACKEND: This file implements the API (Express + MySQL). Keep comments short.
 
-// Middleware
+// Middleware - Allow all origins for easy device connectivity
 app.use(cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    origin: "*", // Allow all origins (any device can connect)
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    credentials: false, // Set to false when using origin: "*"
+    preflightContinue: false,
+    optionsSuccessStatus: 204
 }));
 
-// Allow cross-origin requests from Flutter app
+// Allow cross-origin requests from any device
 // Increase body size limit for image uploads (50MB)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Log all incoming requests for debugging connectivity
+app.use((req, res, next) => {
+    const clientIP = req.ip || req.connection.remoteAddress;
+    console.log(`📱 ${req.method} ${req.path} from ${clientIP}`);
+    next();
+});
 
 // Helper function to get local IP address
 function getLocalIPAddress() {
@@ -906,17 +916,29 @@ function checkAndUpdateIP() {
 // Check for IP changes every 15 seconds
 setInterval(checkAndUpdateIP, 15000);
 
-// Start server
-const PORT = process.env.PORT || 3000;
-const HOST = '0.0.0.0'; // Listen on all network interfaces
+// Start server on port 3000
+const PORT = 3000;
+const HOST = '0.0.0.0'; // Listen on ALL network interfaces (allows any device to connect)
+
 app.listen(PORT, HOST, () => {
     const localIP = getLocalIPAddress();
-    console.log(`🚀 Mobile app Server running on ${HOST}:${PORT}`);
-    console.log("📁 Connected to 'mobi_app' MySQL database");
-    console.log(`🌐 Local Network: http://${localIP}:${PORT}`);
-    console.log(`🌐 Localhost: http://localhost:${PORT}`);
-    console.log(`🌐 Android Emulator: http://10.0.2.2:${PORT}`);
-    console.log(`📱 Use this URL in your Flutter app: http://${localIP}:${PORT}`);
-    console.log(`🔍 Get server IP: http://${localIP}:${PORT}/server-ip`);
-    console.log(`\n🔍 Monitoring network changes (checking every 15s)...`);
+    console.log('\n╔════════════════════════════════════════════════════════════╗');
+    console.log('║          📱 Mobile App Server - Ready for Connections      ║');
+    console.log('╚════════════════════════════════════════════════════════════╝');
+    console.log(`\n🚀 Server running on: ${HOST}:${PORT}`);
+    console.log(`📁 Database: mobi_app (Connected)\n`);
+    
+    console.log('🌐 Connect from ANY device using these URLs:\n');
+    console.log(`   📱 Same Network:     http://${localIP}:${PORT}`);
+    console.log(`   💻 This Computer:    http://localhost:${PORT}`);
+    console.log(`   📲 Android Emulator: http://10.0.2.2:${PORT}`);
+    console.log(`   🔍 Get Server IP:    http://${localIP}:${PORT}/server-ip\n`);
+    
+    console.log('📋 Connection Instructions:');
+    console.log('   1. Make sure devices are on the SAME Wi-Fi network');
+    console.log('   2. Check Windows Firewall allows port 3000');
+    console.log(`   3. Use IP: ${localIP} in your Flutter app\n`);
+    
+    console.log('🔍 Auto-monitoring network changes (every 15s)...');
+    console.log('═══════════════════════════════════════════════════════════\n');
 });
