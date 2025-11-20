@@ -116,6 +116,10 @@ class _StudentHomePageState extends State<StudentHomePage> {
   Future<void> _logout(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
 
+    // Disconnect SSE
+    sseService.disconnect();
+    print("🔌 Disconnected from real-time updates");
+
     // ลบข้อมูลทั้งหมดที่เกี่ยวข้องกับการ Login
     await prefs.remove('token');
     await prefs.remove('userId');

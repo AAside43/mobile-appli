@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:mobile_appli_1/student/student_home_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
+import 'services/sse_service.dart';
 
 import 'register_page.dart';
 import 'student/student_home_page.dart';
@@ -84,6 +85,14 @@ class _LoginPageState extends State<LoginPage> {
           await prefs.setString('token', data['token']);
         } else {
           throw Exception("Token is missing from server response");
+        }
+        
+        // Connect to SSE for real-time updates
+        try {
+          await sseService.connect();
+          print("🔌 Connected to real-time updates");
+        } catch (e) {
+          print("⚠️ SSE connection failed: $e");
         }
 
         if (!mounted) return;

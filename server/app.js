@@ -896,6 +896,9 @@ app.delete('/booking/:id', (req, res) => {
             message: "Booking cancelled successfully",
             bookingId: bookingId
         });
+        
+        // Notify all connected clients about cancellation
+        broadcastEvent('booking_cancelled', { bookingId });
     });
 });
 

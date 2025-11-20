@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import '../login_page.dart';
+import '../services/sse_service.dart';
 
 import 'lecturer_dashboard_page.dart';
 import 'lecturer_approved_page.dart';
@@ -26,6 +28,7 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
   String _errorMessage = '';
   String? _activeFilter;
   DateTime _selectedDate = DateTime.now();
+  StreamSubscription? _sseSub;
 
   @override
   void initState() {
@@ -34,6 +37,25 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
     _activeFilter = widget.filterStatus;
     // เรียกฟังก์ชันใหม่เพื่อดึงข้อมูลสถานะห้องทั้งหมด
     _fetchRoomSlots();
+    
+    // Listen for real-time updates
+    _sseSub = sseService.events.listen((msg) {
+      final event = msg['event'];
+      if (event == 'booking_created' || 
+          event == 'booking_updated' || 
+          event == 'booking_cancelled') {
+        if (mounted) {
+          print('🔔 [Lecturer] Real-time update: $event');
+          _fetchRoomSlots();
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sseSub?.cancel();
+    super.dispose();
   }
 
   // ฟังก์ชันสำหรับดึง Token มาสร้าง Headers

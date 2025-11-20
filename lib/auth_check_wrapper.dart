@@ -8,6 +8,7 @@ import 'login_page.dart';
 import 'student/student_home_page.dart';      
 import 'lecturer/lecturer_dashboard_page.dart';
 import 'staff/staff_dashboard_page.dart';
+import 'services/sse_service.dart';
 
 class AuthCheckWrapper extends StatefulWidget {
   const AuthCheckWrapper({Key? key}) : super(key: key);
@@ -40,6 +41,14 @@ class _AuthCheckWrapperState extends State<AuthCheckWrapper> {
     if (isLoggedIn && role != null && token != null) {
       
       print("✅ Auto-Login as: $role"); // Debug log
+      
+      // Connect to SSE for real-time updates
+      try {
+        await sseService.connect();
+        print("🔌 Connected to real-time updates");
+      } catch (e) {
+        print("⚠️ SSE connection failed: $e");
+      }
 
       // --- 3. แยกทางตาม Role ---
       if (role == 'student') {

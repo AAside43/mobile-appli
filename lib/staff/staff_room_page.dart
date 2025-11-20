@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import '../login_page.dart';
+import '../services/sse_service.dart';
 
 import 'staff_add_room_page.dart';
 import 'staff_dashboard_page.dart';
@@ -23,11 +25,32 @@ class _StaffRoomPageState extends State<StaffRoomPage> {
   List<dynamic> roomList = [];
   bool _isLoading = true;
   Map<int, Map<String, int>> roomBookingStats = {}; // room_id -> {pending: x, approved: y}
+  StreamSubscription? _sseSub;
 
   @override
   void initState() {
     super.initState();
     _fetchRooms();
+    
+    // Listen for real-time updates
+    _sseSub = sseService.events.listen((msg) {
+      final event = msg['event'];
+      if (event == 'booking_created' || 
+          event == 'booking_updated' || 
+          event == 'booking_cancelled' ||
+          event == 'room_changed') {
+        if (mounted) {
+          print('🔔 [Staff] Real-time update: $event');
+          _fetchRooms();
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sseSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _logout() async {
