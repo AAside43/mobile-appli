@@ -1,16 +1,16 @@
 const express = require('express');
 const app = express();
 const db = require('./db');
-const con = db;
+const con = db; // `db` is the connection object; db.connect() is available to wait for readiness
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const secretKey = 'My_Secret_Key_1234';
+const secretKey = process.env.JWT_SECRET || 'My_Secret_Key_1234';
 const os = require('os');
 
-// Initialize database from mobi_app.sql on server start (optional - comment out after first run)
-// Uncomment this line only when you want to reset/initialize the database
-// db.initializeDatabase();
+// FRONTEND / BACKEND
+// FRONTEND: Flutter app (in ./lib/) calls these HTTP endpoints.
+// BACKEND: This file implements the API (Express + MySQL). Keep comments short.
 
 // Middleware
 app.use(cors({
@@ -56,7 +56,89 @@ app.get('/server-ip', (req, res) => {
     });
 });
 
-// Test endpoint
+// --- Auth middleware (JWT) ---
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (!authHeader) return res.status(401).json({ error: 'Missing Authorization header' });
+
+    const parts = authHeader.split(' ');
+    if (parts.length !== 2 || parts[0] !== 'Bearer') return res.status(401).json({ error: 'Malformed Authorization header' });
+
+    const token = parts[1];
+    jwt.verify(token, secretKey, (err, payload) => {
+        if (err) return res.status(401).json({ error: 'Invalid or expired token' });
+        // attach user info to request
+        req.user = payload;
+        next();
+    });
+}
+
+function authorizeRole(requiredRole) {
+    return (req, res, next) => {
+        if (!req.user || !req.user.role) return res.status(403).json({ error: 'Forbidden' });
+        if (req.user.role !== requiredRole) return res.status(403).json({ error: 'Access restricted to ' + requiredRole });
+        next();
+    };
+}
+
+// --- Server-Sent Events (SSE) for realtime notifications ---
+const sseClients = new Set();
+
+/* --- API ROUTES START --- */
+app.get('/events', (req, res) => {
+    // Keep connection open for SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders && res.flushHeaders();
+
+    // send a comment to keep the connection alive initially
+    res.write(': connected\n\n');
+
+    sseClients.add(res);
+
+    req.on('close', () => {
+        sseClients.delete(res);
+    });
+});
+
+function broadcastEvent(eventName, payload) {
+    const data = `event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`;
+    for (const client of sseClients) {
+        try {
+            client.write(data);
+        } catch (e) {
+            // ignore write errors and remove client
+            sseClients.delete(client);
+        }
+    }
+}
+
+// --- Authenticated: show current logged-in user's role/info ---
+app.get('/me', authenticateToken, (req, res) => {
+    const payload = req.user || {};
+    const userId = payload.userId;
+    const role = payload.role;
+
+    if (!userId) return res.status(400).json({ error: 'Invalid token payload' });
+
+    // Attempt to return user record from DB for extra context (name, role)
+    const sql = 'SELECT user_id, name, role FROM users WHERE user_id = ?';
+    con.query(sql, [userId], (err, results) => {
+        if (err) {
+            console.error('DB error (/me):', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+        if (results.length === 0) {
+            // Token had a userId but DB doesn't have it
+            return res.json({ userId, role });
+        }
+        const user = results[0];
+        return res.json({ user, token: { userId, role } });
+    });
+});
+
+// Public (used by frontend): test/discovery endpoint
 app.get('/', (req, res) => {
     const localIP = getLocalIPAddress();
     res.json({
@@ -87,27 +169,46 @@ app.get('/', (req, res) => {
     });
 });
 
-// Test database connection endpoint
-app.get('/test-db', (req, res) => {
-    const sql = "SELECT 'mobi_app database connection successful!' as message, COUNT(*) as user_count FROM users";
-    con.query(sql, function (err, results) {
-        if (err) {
-            console.error('Database connection test failed:', err);
-            return res.status(500).json({
-                error: "Database connection failed",
-                database: "mobi_app",
-                details: err.message
-            });
-        }
+/**
+ * GET /test-db
+ * Public. Quick DB connectivity check used by the frontend to verify server+DB.
+ * Response: { database, status, test_result }
+ */
+app.get('/test-db', async (req, res) => {
+    try {
+        // gather simple counts for main tables
+        const [usersRows] = await con.promise().query('SELECT COUNT(*) as count FROM users');
+        const [roomsRows] = await con.promise().query('SELECT COUNT(*) as count FROM rooms');
+        const [bookingsRows] = await con.promise().query('SELECT COUNT(*) as count FROM bookings');
+
+        // latest booking date (if any)
+        const [latestBooking] = await con.promise().query("SELECT MAX(booking_date) as latest_booking_date FROM bookings");
+
         res.json({
             database: 'mobi_app',
             status: 'Connected successfully',
-            test_result: results[0]
+            counts: {
+                users: usersRows[0].count || 0,
+                rooms: roomsRows[0].count || 0,
+                bookings: bookingsRows[0].count || 0
+            },
+            latest_booking_date: latestBooking[0].latest_booking_date || null
         });
-    });
+    } catch (err) {
+        console.error('Database connection test failed:', err);
+        return res.status(500).json({
+            error: "Database connection failed",
+            database: "mobi_app",
+            details: err.message
+        });
+    }
 });
 
-// Initialize database from mobi_app.sql file
+/**
+ * POST /init-db
+ * Admin: Trigger initial DB population from mobi_app.sql (one-time use).
+ * No body. Responds with a message when initialization is started.
+ */
 app.post('/init-db', (req, res) => {
     try {
         db.initializeDatabase();
@@ -125,6 +226,11 @@ app.post('/init-db', (req, res) => {
     }
 });
 
+/**
+ * GET /password/:pass
+ * Utility (dev-only). Returns bcrypt hash for given password param.
+ * Not used by production frontend.
+ */
 app.get('/password/:pass', (req, res) => {
     const password = req.params.pass;
     bcrypt.hash(password, 10, function (err, hash) {
@@ -135,7 +241,12 @@ app.get('/password/:pass', (req, res) => {
     });
 });
 
-// Register endpoint
+/**
+ * POST /register
+ * Public. Create a new user (defaults to role 'student').
+ * Body: { username, password, email? }
+ * Response: 201 { message, userId } or error.
+ */
 app.post('/register', (req, res) => {
     const { username, password, email } = req.body;
 
@@ -174,7 +285,12 @@ app.post('/register', (req, res) => {
     });
 });
 
-// login
+/**
+ * POST /login
+ * Public. Authenticate user and return JWT token.
+ * Body: { username, password }
+ * Response: { token, userId, role }
+ */
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
 
@@ -219,7 +335,11 @@ app.post('/login', (req, res) => {
     })
 });
 
-// Get user profile
+/**
+ * GET /user/:id
+ * Public. Retrieve basic user profile (user_id, name, role).
+ * Params: id (user_id)
+ */
 app.get('/user/:id', (req, res) => {
     const userId = req.params.id;
     const sql = "SELECT user_id, name, role FROM users WHERE user_id = ?";
@@ -234,7 +354,11 @@ app.get('/user/:id', (req, res) => {
     });
 });
 
-// Get all rooms (Original simple version)
+/**
+ * GET /rooms
+ * Public. Return list of rooms with basic metadata.
+ * Response: { message, rooms }
+ */
 app.get('/rooms', (_req, res) => {
     const sql = "SELECT r.room_id, r.name, r.description, r.capacity, r.is_available, r.image FROM rooms r ORDER BY r.room_id";
     con.query(sql, function (err, results) {
@@ -363,7 +487,11 @@ app.put('/rooms/:id', (req, res) => {
 
 // --- ⬇️ NEW/MODIFIED ENDPOINTS BASED ON REQUIREMENTS ⬇️ ---
 
-// MODIFIED ENDPOINT: Get dashboard stats (Counts slots, but disabled as rooms)
+/**
+ * GET /dashboard/stats
+ * Lecturer/Staff. Return aggregated counts for dashboard (pending/reserved/disabled/free slots).
+ * Response: { pending_slots, reserved_slots, disabled_rooms, free_slots }
+ */
 app.get('/dashboard/stats', async (req, res) => {
     // กำหนดว่ามี 4 slots ต่อห้อง
     const SLOTS_PER_ROOM = 4;
@@ -413,6 +541,11 @@ app.get('/dashboard/stats', async (req, res) => {
     }
 });
 
+/**
+ * GET /rooms/slots
+ * Public/Lecturer. Return each room with today's time slots and slot status (free/pending/reserved/disabled).
+ * Response: { message, rooms: [{ room_id, name, time_slots: [{time, status}] }] }
+ */
 app.get('/rooms/slots', (req, res) => {
     const roomsSql = "SELECT room_id, name, capacity, is_available FROM rooms";
     // สมมติว่า 'bookings' มีคอลัมน์ 'booking_date' และ 'time_slot'
@@ -461,7 +594,11 @@ app.get('/rooms/slots', (req, res) => {
     });
 });
 
-// MODIFIED ENDPOINT: Get pending bookings (for approved_page.dart)
+/**
+ * GET /bookings/pending
+ * Lecturer. List pending booking requests (includes room and student info, image_url if present).
+ * Response: { message, requests: [...] }
+ */
 app.get('/bookings/pending', (req, res) => {
     // อัปเดต SQL: เพิ่ม image_url และ LEFT JOIN roomimages
     const sql = `
@@ -508,7 +645,11 @@ app.get('/bookings/pending', (req, res) => {
     });
 });
 
-// NEW ENDPOINT: Get ALL completed bookings (for Lecturer/Staff History Page)
+/**
+ * GET /bookings/history
+ * Lecturer/Staff. Return completed bookings (approved or rejected) for history view.
+ * Response: { message, bookings: [...] }
+ */
 app.get('/bookings/history', (req, res) => {
     // ดึงข้อมูลทั้งหมดที่ status ไม่ใช่ 'pending' หรือ 'cancelled'
     const sql = `
@@ -556,7 +697,11 @@ app.get('/bookings/history', (req, res) => {
     });
 });
 
-// MODIFIED ENDPOINT: Approve/Disapprove booking (now with rejection_reason)
+/**
+ * PUT /booking/:id/status
+ * Lecturer. Approve or reject a pending booking. Records approver and optional rejection_reason.
+ * Body: { status: 'approved'|'rejected', approverId, rejection_reason? }
+ */
 app.put('/booking/:id/status', (req, res) => {
     const bookingId = req.params.id;
     // ดึง rejection_reason ที่ส่งมาจาก Pop-up
@@ -586,11 +731,17 @@ app.put('/booking/:id/status', (req, res) => {
             bookingId: bookingId,
             newStatus: status
         });
+        // notify SSE subscribers about booking status change
+        broadcastEvent('booking_updated', { bookingId, status, approverId, rejection_reason });
     });
 });
 
-// MODIFIED ENDPOINT: Book a room
-// (ปรับปรุงให้ตรงตามข้อกำหนด "A student can book time slot for only today", "status is pending", "book a single slot in one day")
+/**
+ * POST /book-room
+ * Student. Request a booking for a single time slot on a given day (status starts as 'pending').
+ * Body: { userId, roomId, booking_date (YYYY-MM-DD), time_slot }
+ * Response: 201 { message, bookingId } or 4xx/5xx errors.
+ */
 app.post('/book-room', (req, res) => {
     // สมมติว่า client ส่ง 'booking_date' (YYYY-MM-DD) และ 'time_slot' (เช่น '08:00-10:00')
     // และ 'reason' จาก history_page
@@ -631,18 +782,24 @@ app.post('/book-room', (req, res) => {
                         console.error('Database error:', err);
                         return res.status(500).json({ error: "Database booking error" });
                     }
+                    const bookingId = result.insertId;
                     res.status(201).json({
                         message: "Room booking request submitted successfully. Status is pending.",
-                        bookingId: result.insertId
+                        bookingId: bookingId
                     });
+                    // notify SSE subscribers about new booking
+                    broadcastEvent('booking_created', { bookingId, userId, roomId, booking_date, time_slot });
                 });
             });
         });
     });
 });
 
-// MODIFIED ENDPOINT: Get user's bookings (for history_page.dart)
-// (ปรับปรุงให้รวมข้อมูล "who approved", "date", "time", "reason" ตามที่ history_page ต้องการ)
+/**
+ * GET /user/:id/bookings
+ * Public. Return booking history for a user (includes approver info when available).
+ * Params: id (user_id)
+ */
 app.get('/user/:id/bookings', (req, res) => {
     const userId = req.params.id;
     // สมมติว่า 'bookings' มี 'booking_date', 'time_slot', 'reason', และ 'approver_id'
@@ -690,8 +847,11 @@ b.booking_id, b.user_id, b.room_id, b.status,
 });
 
 
-// Cancel booking (Student action - kept as is)
-// (ข้อกำหนดของ Lecturer คือ "reject" ซึ่งจัดการโดย PUT /booking/:id/status)
+/**
+ * DELETE /booking/:id
+ * Student. Cancel their booking (marks status = 'cancelled').
+ * Params: id (booking_id)
+ */
 app.delete('/booking/:id', (req, res) => {
     const bookingId = req.params.id;
 
@@ -716,6 +876,7 @@ app.delete('/booking/:id', (req, res) => {
 });
 
 // --- ⬆️ END OF NEW/MODIFIED ENDPOINTS ⬆️ ---
+/* --- API ROUTES END --- */
 
 // Auto-update config.dart when IP changes
 let currentServerIP = getLocalIPAddress();

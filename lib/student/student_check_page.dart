@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../config.dart'; 
-import '../login_page.dart'; 
+import '../config.dart';
+import '../login_page.dart';
 
 import 'student_room_page.dart';
 import 'student_history_page.dart';
 import 'student_home_page.dart';
+import '../services/sse_service.dart';
+import '../widgets/skeleton.dart';
 
 class StudentCheckPage extends StatefulWidget {
   const StudentCheckPage({Key? key}) : super(key: key);
@@ -29,6 +32,33 @@ class _StudentCheckPageState extends State<StudentCheckPage> {
     super.initState();
     _loadUserRole();
     _loadBookingRequests();
+    _sseSub = sseService.events.listen((msg) {
+      final event = msg['event'];
+      if (event == 'booking_created' || event == 'booking_updated') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(event == 'booking_created'
+                  ? 'New booking created'
+                  : 'Booking updated'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          _loadBookingRequests();
+        }
+      } else if (event == 'room_changed') {
+        // rooms changed may affect requests listing in some setups
+        if (mounted) _loadBookingRequests();
+      }
+    });
+  }
+
+  StreamSubscription? _sseSub;
+
+  @override
+  void dispose() {
+    _sseSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadUserRole() async {
@@ -274,8 +304,44 @@ class _StudentCheckPageState extends State<StudentCheckPage> {
       // BODY
       // ==============================
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFFFA726)),
+          ? Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: List.generate(4, (i) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withAlpha((0.03 * 255).round()),
+                            blurRadius: 6),
+                      ],
+                    ),
+                    child: const Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SkeletonBox(height: 14, width: 120),
+                              SizedBox(height: 8),
+                              SkeletonBox(height: 12, width: 80),
+                              SizedBox(height: 6),
+                              SkeletonBox(height: 12),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        SkeletonBox(height: 28, width: 80),
+                      ],
+                    ),
+                  );
+                }),
+              ),
             )
           : Padding(
               padding: const EdgeInsets.all(16),
@@ -307,7 +373,8 @@ class _StudentCheckPageState extends State<StudentCheckPage> {
                             border: Border.all(color: Colors.grey.shade200),
                             boxShadow: [
                               BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
+                                  color: Colors.black
+                                      .withAlpha((0.08 * 255).round()),
                                   blurRadius: 6),
                             ],
                           ),
@@ -422,11 +489,11 @@ class _StudentCheckPageState extends State<StudentCheckPage> {
           showUnselectedLabels: true,
           onTap: (index) {
             if (index == 0) {
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (_) => const StudentHomePage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const StudentHomePage()));
             } else if (index == 1) {
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (_) => const StudentRoomPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const StudentRoomPage()));
             } else if (index == 2) {
               // Already on Check Request, do nothing
             } else if (index == 3) {

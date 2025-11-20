@@ -141,7 +141,7 @@ class _LecturerDashboardPageState extends State<LecturerDashboardPage> {
           borderRadius: BorderRadius.circular(12), // มุมโค้ง
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withAlpha((0.1 * 255).round()),
               blurRadius: 4,
               offset: const Offset(0, 2),
             )
@@ -155,7 +155,7 @@ class _LecturerDashboardPageState extends State<LecturerDashboardPage> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withAlpha((0.7 * 255).round()),
               ),
             ),
             const SizedBox(height: 8),
@@ -262,7 +262,7 @@ class _LecturerDashboardPageState extends State<LecturerDashboardPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withAlpha((0.1 * 255).round()),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),

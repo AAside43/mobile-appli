@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import '../login_page.dart';
+import '../services/sse_service.dart';
+import '../widgets/skeleton.dart';
 import 'package:intl/intl.dart';
 
 import 'student_home_page.dart';
@@ -33,7 +36,7 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
   final String baseUrl = apiBaseUrl;
 
   // ตัวแปรเก็บประวัติการจอง (แชร์ข้ามหน้า)
-  static List<Map<String, String>> _bookingHistory = [];
+  static final List<Map<String, String>> _bookingHistory = [];
 
   final List<String> timeSlots = [
     '08:00-10:00',
@@ -49,7 +52,36 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
   void initState() {
     super.initState();
     _loadAllData();
+    // listen for server-sent events and show lightweight in-app notifications
+    _sseSub = sseService.events.listen((msg) {
+      final event = msg['event'];
+      if (event == 'room_changed') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Room updated'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          _loadAllData();
+        }
+      } else if (event == 'booking_created' || event == 'booking_updated') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(event == 'booking_created'
+                  ? 'New booking created'
+                  : 'Booking updated'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          _loadBookingsFromServer();
+        }
+      }
+    });
   }
+
+  StreamSubscription? _sseSub;
 
   // ฟังก์ชันสำหรับดึง Token มาสร้าง Headers
   Future<Map<String, String>> _getAuthHeaders() async {
@@ -471,10 +503,12 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
   }
 
   // รีเซ็ตข้อมูลตอน Logout
-  void _resetAll() {
-    setState(() {
-      _resetStatic();
-    });
+  // No-op reset helper was unused; static reset is available instead.
+
+  @override
+  void dispose() {
+    _sseSub?.cancel();
+    super.dispose();
   }
 
   // ฟังก์ชัน static สำหรับใช้รีเซ็ตข้อมูลจากหน้าอื่น (ไม่ต้อง setState)
@@ -587,7 +621,7 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Colors.black.withOpacity(0.25),
+                    color: Colors.black.withAlpha((0.25 * 255).round()),
                     width: 1,
                   ),
                 ),
@@ -795,7 +829,7 @@ class _StudentRoomPageState extends State<StudentRoomPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withAlpha((0.1 * 255).round()),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),

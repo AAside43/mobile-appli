@@ -131,7 +131,7 @@ class _StaffHistoryPageState extends State<StaffHistoryPage> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
+                        boxShadow: const [
                           BoxShadow(color: Colors.black12, blurRadius: 6)
                         ],
                       ),
@@ -171,13 +171,13 @@ class _StaffHistoryPageState extends State<StaffHistoryPage> {
                   },
                 ),
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
                 color: Colors.black12,
                 blurRadius: 12,
-                offset: const Offset(0, -2))
+                offset: Offset(0, -2))
           ],
         ),
         child: BottomNavigationBar(
@@ -185,12 +185,12 @@ class _StaffHistoryPageState extends State<StaffHistoryPage> {
           currentIndex: 2,
           selectedItemColor: Colors.orange[700],
           onTap: (index) {
-            if (index == 0)
+            if (index == 0) {
               Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
                       builder: (_) => const StaffDashboardPage()));
-            else if (index == 1)
+            } else if (index == 1)
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const StaffRoomPage()));
           },

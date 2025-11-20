@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'package:intl/intl.dart';
 import '../config.dart';
 import '../login_page.dart';
 
 import 'student_room_page.dart';
 import 'student_check_page.dart';
 import 'student_history_page.dart';
+import '../services/sse_service.dart';
 
 class StudentHomePage extends StatefulWidget {
   const StudentHomePage({Key? key}) : super(key: key);
@@ -21,11 +24,75 @@ class _StudentHomePageState extends State<StudentHomePage> {
   final String baseUrl = apiBaseUrl;
   bool _isLoading = true;
   List<Map<String, dynamic>> rooms = [];
+  DateTime _now = DateTime.now();
+  Timer? _clockTimer;
+  String? _role;
+  final PageController _pageController = PageController();
+  int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _loadRoomsFromServer();
+    _startClock();
+    _loadRole();
+    _startSse();
+  }
+
+  final SseService _sse = sseService;
+
+  void _startSse() async {
+    await _sse.connect();
+    _sse.events.listen((msg) {
+      final event = msg['event'];
+      if (event == 'room_changed') {
+        // refresh rooms on any room change
+        _loadRoomsFromServer();
+      } else if (event == 'booking_created' || event == 'booking_updated') {
+        // optionally refresh bookings page or show notification
+      }
+    });
+  }
+
+  void _startClock() {
+    _clockTimer?.cancel();
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      setState(() {
+        _now = DateTime.now();
+      });
+    });
+  }
+
+  Future<void> _loadRole() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? r = prefs.getString('role');
+      setState(() {
+        _role = r;
+      });
+    } catch (e) {
+      // ignore and leave role null
+    }
+  }
+
+  String _rolePurpose() {
+    switch (_role) {
+      case 'student':
+        return 'Student — can book slots and view history.';
+      case 'lecturer':
+        return 'Lecturer — review and approve booking requests.';
+      case 'staff':
+        return 'Staff — manage rooms (add/edit/delete) and view dashboard.';
+      default:
+        return _role == null ? 'Role: not set' : 'Role: $_role';
+    }
+  }
+
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
   }
 
   // ฟังก์ชันสำหรับดึง Token มาสร้าง Headers
@@ -172,7 +239,7 @@ class _StudentHomePageState extends State<StudentHomePage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 3,
-        shadowColor: Colors.black.withOpacity(0.15),
+        shadowColor: Colors.black.withAlpha((0.15 * 255).round()),
         title: const Text(
           "Home",
           style: TextStyle(
@@ -186,15 +253,13 @@ class _StudentHomePageState extends State<StudentHomePage> {
           IconButton(
             icon: const Icon(
               Icons.logout_rounded,
-              color: Colors.red, // สีแดง
+              color: Colors.red,
               size: 26,
             ),
             onPressed: () {
-              // popup ยืนยันก่อนออก
               showDialog(
                 context: context,
                 builder: (dialogContext) => AlertDialog(
-                  // ใช้ dialogContext
                   title: const Text(
                     "Logout",
                     style: TextStyle(fontWeight: FontWeight.bold),
@@ -202,15 +267,12 @@ class _StudentHomePageState extends State<StudentHomePage> {
                   content: const Text("Are you sure you want to log out?"),
                   actions: [
                     TextButton(
-                      onPressed: () =>
-                          Navigator.pop(dialogContext), // ❇️ ปิด dialog
+                      onPressed: () => Navigator.pop(dialogContext),
                       child: const Text("Cancel"),
                     ),
                     TextButton(
-                      // 8. แก้ไขปุ่ม Logout
                       onPressed: () {
-                        // ไม่ต้อง pop(dialogContext) เพราะ _logout จะนำทางออกไปเลย
-                        _logout(context); // เรียกใช้ฟังก์ชัน _logout
+                        _logout(context);
                       },
                       child: const Text(
                         "Logout",
@@ -225,123 +287,162 @@ class _StudentHomePageState extends State<StudentHomePage> {
         ],
       ),
 
-      // BODY
-      body: Container(
-        color: const Color(0xFFF8F9FB),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Date Box
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.black, width: 1.5),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.calendar_today_outlined, color: Colors.black54),
-                    SizedBox(width: 10),
-                    Text(
-                      "Today: Nov 21, 2025",
-                      style: TextStyle(fontSize: 15, color: Colors.black87),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 15),
-
-              // Grid of Rooms
-              Expanded(
-                child: GridView.builder(
-                  itemCount: rooms.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 14,
-                    childAspectRatio: 1.05,
-                  ),
-                  itemBuilder: (context, index) {
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
+      // BODY: single-app PageView for smooth navigation between main sections
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (idx) => setState(() => _currentIndex = idx),
+        children: [
+          // HOME (improved UI)
+          Container(
+            color: const Color(0xFFF8F9FB),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Animated Date Box
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: Container(
+                      key: ValueKey(
+                          DateFormat('EEE, MMM d, yyyy HH:mm').format(_now)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 15, vertical: 14),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(15),
+                        borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                            color: Colors.black.withAlpha((0.06 * 255).round()),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // ภาพห้องให้ลอยมีเงา
-                            Expanded(
-                              child: Container(
-                                margin: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.25),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 5),
-                                    ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today_outlined,
+                              color: Colors.black54),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                    DateFormat('EEE, MMM d, yyyy').format(_now),
+                                    style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(DateFormat('HH:mm:ss').format(_now),
+                                        style: const TextStyle(
+                                            color: Colors.black54)),
+                                    Text(_rolePurpose(),
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.black54)),
                                   ],
                                 ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.asset(
-                                    rooms[index]["image"],
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                  ),
-                                ),
-                              ),
+                              ],
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              rooms[index]["name"],
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: Colors.black,
-                              ),
-                            ),
-                            Text(
-                              "Capacity : ${rooms[index]["capacity"]}",
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.black54,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                        ),
+                          )
+                        ],
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Rooms grid with pull-to-refresh and smooth cards
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: _loadRoomsFromServer,
+                      child: GridView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: rooms.length,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 14,
+                          childAspectRatio: 0.95,
+                        ),
+                        itemBuilder: (context, index) {
+                          final room = rooms[index];
+                          return GestureDetector(
+                            onTap: () {
+                              // subtle tap animation then navigate to room page
+                              Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => const StudentRoomPage()));
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOutCubic,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color: Colors.black
+                                          .withAlpha((0.08 * 255).round()),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 8)),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: const BorderRadius.only(
+                                        topLeft: Radius.circular(14),
+                                        topRight: Radius.circular(14)),
+                                    child: Image.asset(room['image'],
+                                        fit: BoxFit.cover,
+                                        height: 110,
+                                        width: double.infinity),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(10),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(room['name'],
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 6),
+                                        Text(room['capacity'],
+                                            style: const TextStyle(
+                                                color: Colors.black54,
+                                                fontSize: 12)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+
+          // ROOM PAGE
+          const StudentRoomPage(),
+          // CHECK REQUEST PAGE
+          const StudentCheckPage(),
+          // HISTORY PAGE
+          const StudentHistoryPage(),
+        ],
       ),
 
       // BOTTOM NAV BAR
@@ -350,14 +451,14 @@ class _StudentHomePageState extends State<StudentHomePage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withAlpha((0.1 * 255).round()),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
           ],
         ),
         child: BottomNavigationBar(
-          currentIndex: 0, // ✅ หน้านี้คือ Home
+          currentIndex: _currentIndex,
           type: BottomNavigationBarType.fixed,
           selectedItemColor: const Color(0xFFFFA726),
           unselectedItemColor: Colors.black54,

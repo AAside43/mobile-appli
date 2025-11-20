@@ -135,14 +135,14 @@ class _LecturerHistoryPageState extends State<LecturerHistoryPage> {
 
     if (_isLecturerOrStaff) {
       if (index == 0) {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const LecturerDashboardPage()));
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (_) => const LecturerDashboardPage()));
       } else if (index == 1) {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const LecturerRoomPage()));
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (_) => const LecturerRoomPage()));
       } else if (index == 2) {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const LecturerApprovedPage()));
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (_) => const LecturerApprovedPage()));
       }
     }
     // สำหรับ Student (มี 3 ปุ่ม)
@@ -153,8 +153,8 @@ class _LecturerHistoryPageState extends State<LecturerHistoryPage> {
         //     context, MaterialPageRoute(builder: (_) => const HomePage()));
       } else if (index == 1) {
         // (สมมติว่าหน้าจองของ Student คือ RoomPage)
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const LecturerRoomPage()));
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (_) => const LecturerRoomPage()));
       }
     }
   }
@@ -231,14 +231,14 @@ class _LecturerHistoryPageState extends State<LecturerHistoryPage> {
             : _errorMessage.isNotEmpty
                 ? Center(
                     child: Text(_errorMessage,
-                        style: TextStyle(color: Colors.red)))
+                        style: const TextStyle(color: Colors.red)))
                 : _historyList.isEmpty
                     ? Center(
                         child: Text(
                           _isLecturerOrStaff
                               ? "No approved/rejected history yet"
                               : "No booking history yet",
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                          style: const TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                       )
                     : ListView.builder(
@@ -258,7 +258,8 @@ class _LecturerHistoryPageState extends State<LecturerHistoryPage> {
                               borderRadius: BorderRadius.circular(12),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: Colors.black
+                                      .withAlpha((0.1 * 255).round()),
                                   blurRadius: 6,
                                   offset: const Offset(0, 3),
                                 ),
@@ -337,7 +338,7 @@ class _LecturerHistoryPageState extends State<LecturerHistoryPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withAlpha((0.1 * 255).round()),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),

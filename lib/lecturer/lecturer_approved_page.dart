@@ -121,15 +121,15 @@ class _LecturerApprovedPageState extends State<LecturerApprovedPage> {
     });
     if (index == 0) {
       Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (_) => LecturerDashboardPage()));
+          context, MaterialPageRoute(builder: (_) => const LecturerDashboardPage()));
     } else if (index == 1) {
       Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (_) => LecturerRoomPage()));
+          context, MaterialPageRoute(builder: (_) => const LecturerRoomPage()));
     } else if (index == 2) {
       // CURRENT PAGE
     } else if (index == 3) {
       Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (_) => LecturerHistoryPage()));
+          context, MaterialPageRoute(builder: (_) => const LecturerHistoryPage()));
     }
   }
 
@@ -220,7 +220,6 @@ class _LecturerApprovedPageState extends State<LecturerApprovedPage> {
               },
             ),
             ElevatedButton(
-              child: const Text('Submit Reject'),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () {
                 final reason = reasonController.text.trim();
@@ -237,6 +236,7 @@ class _LecturerApprovedPageState extends State<LecturerApprovedPage> {
                 // เรียก API
                 _callProcessApi(index, 'rejected', reason);
               },
+              child: const Text('Submit Reject'),
             ),
           ],
         );
@@ -263,10 +263,12 @@ class _LecturerApprovedPageState extends State<LecturerApprovedPage> {
     if (lowerRoomName.contains('room 3')) return 'assets/images/Room3.jpg';
     if (lowerRoomName.contains('room 4')) return 'assets/images/Room4.jpg';
     if (lowerRoomName.contains('study room')) return 'assets/images/Room1.jpg';
-    if (lowerRoomName.contains('meeting room'))
+    if (lowerRoomName.contains('meeting room')) {
       return 'assets/images/Room2.jpg';
-    if (lowerRoomName.contains('entertaining space'))
+    }
+    if (lowerRoomName.contains('entertaining space')) {
       return 'assets/images/Room3.jpg';
+    }
     return 'assets/images/Room1.jpg';
   }
 
@@ -324,7 +326,7 @@ class _LecturerApprovedPageState extends State<LecturerApprovedPage> {
           : _errorMessage.isNotEmpty
               ? Center(
                   child:
-                      Text(_errorMessage, style: TextStyle(color: Colors.red)))
+                      Text(_errorMessage, style: const TextStyle(color: Colors.red)))
               : _requests.isEmpty
                   ? const Center(
                       child: Text(
@@ -347,13 +349,13 @@ class _LecturerApprovedPageState extends State<LecturerApprovedPage> {
 
       /// Bottom Navigation Bar
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Color.fromRGBO(0, 0, 0, 0.1),
               blurRadius: 8,
-              offset: const Offset(0, -2),
+              offset: Offset(0, -2),
             ),
           ],
         ),
@@ -365,9 +367,9 @@ class _LecturerApprovedPageState extends State<LecturerApprovedPage> {
           showUnselectedLabels: true,
           onTap: onTabTapped,
           items: [
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
                 icon: Icon(Icons.home_filled), label: "Dashboard"),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
                 icon: Icon(Icons.meeting_room_outlined), label: "Room"),
             BottomNavigationBarItem(
               icon: Container(
@@ -380,7 +382,7 @@ class _LecturerApprovedPageState extends State<LecturerApprovedPage> {
               ),
               label: "Check Request",
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
                 icon: Icon(Icons.history), label: "History"),
           ],
         ),

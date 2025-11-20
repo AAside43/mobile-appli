@@ -192,8 +192,8 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
                   border: Border.all(color: Colors.black, width: 1.5),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Row(
-                  children: const [
+                child: const Row(
+                  children: [
                     Icon(Icons.calendar_today_outlined,
                         color: Colors.black54, size: 18),
                     SizedBox(width: 8),
@@ -213,7 +213,7 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
                       ? Expanded(
                           child: Center(
                               child: Text(_errorMessage,
-                                  style: TextStyle(color: Colors.red))))
+                                  style: const TextStyle(color: Colors.red))))
                       : _rooms.isEmpty
                           ? const Expanded(
                               child: Center(child: Text("No rooms found.")))
@@ -402,7 +402,7 @@ class _LecturerRoomPageState extends State<LecturerRoomPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withAlpha((0.1 * 255).round()),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),

@@ -1,13 +1,19 @@
-const mysql = require("mysql2");
+const mysql = require('mysql2');
 const fs = require('fs');
 const path = require('path');
 
+// Read DB config from environment variables with sensible defaults
+const DB_HOST = process.env.DB_HOST || 'localhost';
+const DB_USER = process.env.DB_USER || 'root';
+const DB_PASSWORD = process.env.DB_PASSWORD || '';
+const DB_NAME = process.env.DB_NAME || 'mobi_app';
+
 // Database connection to mobi_app database
 const con = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: '',
-    database: 'mobi_app', // This connects to the mobi_app database
+    host: DB_HOST,
+    user: DB_USER,
+    password: DB_PASSWORD,
+    database: DB_NAME,
     multipleStatements: true // Allow multiple SQL statements
 });
 
@@ -34,53 +40,5 @@ con.connect(function(err) {
     });
 });
 
-// Function to initialize database from mobi_app.sql
-function initializeDatabase() {
-    const sqlFilePath = path.join(__dirname, 'mobi_app.sql');
-    
-    if (!fs.existsSync(sqlFilePath)) {
-        console.warn('Warning: mobi_app.sql file not found');
-        return;
-    }
-    
-    // Read and modify SQL to use CREATE TABLE IF NOT EXISTS
-    let sql = fs.readFileSync(sqlFilePath, 'utf8');
-    
-    // Replace CREATE TABLE with CREATE TABLE IF NOT EXISTS
-    sql = sql.replace(/CREATE TABLE /g, 'CREATE TABLE IF NOT EXISTS ');
-    
-    // Split by INSERT statements to avoid duplicate data
-    const statements = sql.split(';').filter(stmt => stmt.trim());
-    
-    // Execute statements one by one
-    let executed = 0;
-    let errors = 0;
-    
-    statements.forEach((statement, index) => {
-        if (statement.trim()) {
-            con.query(statement, function(err) {
-                if (err) {
-                    // Ignore duplicate entry errors
-                    if (!err.message.includes('Duplicate entry')) {
-                        errors++;
-                        console.warn(`Warning on statement ${index + 1}:`, err.message);
-                    }
-                } else {
-                    executed++;
-                }
-                
-                // Log success when all statements are processed
-                if (index === statements.length - 1) {
-                    if (errors === 0) {
-                        console.log('✅ Database initialized successfully from mobi_app.sql');
-                    } else {
-                        console.log('⚠️ Database initialized with ${errors} warnings (${executed} statements executed');
-                    }
-                }
-            });
-        }
-    });
-}
-
+// Export the connection
 module.exports = con;
-module.exports.initializeDatabase = initializeDatabase;
