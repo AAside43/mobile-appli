@@ -121,50 +121,84 @@ class _StaffHistoryPageState extends State<StaffHistoryPage> {
           : historyList.isEmpty
               ? const Center(child: Text("No history"))
               : ListView.builder(
-                  padding: const EdgeInsets.all(16),
                   itemCount: historyList.length,
                   itemBuilder: (context, index) {
                     final item = historyList[index];
+
+                    // ❇️ ดึงเหตุผลการปฏิเสธออกมา
+                    final String? rejectionReason = item["rejection_reason"];
+
                     return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
+                      margin: const EdgeInsets.only(bottom: 14),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black12, blurRadius: 6)
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha((0.1 * 255).round()),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
                         ],
                       ),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(item['room_name'] ?? "Room",
-                                    style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF3E7BFA))),
-                                Text("Date: ${item['booking_date']}"),
-                                Text("Time: ${item['time_slot']}"),
                                 Text(
-                                    "By: ${item['student_name'] ?? 'Student'}"),
+                                  item["room"],
+                                  style: const TextStyle(
+                                    color: Color(0xFF3E7BFA),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(item["capacity"]),
+                                const SizedBox(height: 4),
+                                Text("Date : ${item["date"]}"),
+                                Text("Time : ${item["time"]}"),
+                                Text("Reason : ${item["reason"] ?? 'N/A'}"),
+                                Text("Reserved by : ${item["reserved"]}"),
+                                Text("Approved by : ${item["approved"]}"),
+
+                                // ❇️ นี่คือ Widget ที่เพิ่มเข้ามา ❇️
+                                // (แสดงผลเฉพาะถ้า Status = Rejected และมีเหตุผล)
+                                if (item["status"] == "Rejected" &&
+                                    rejectionReason != null &&
+                                    rejectionReason.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0),
+                                    child: Text(
+                                      "Reject Reason: $rejectionReason",
+                                      style: TextStyle(
+                                        color: Colors.red[700],
+                                        fontWeight: FontWeight.bold,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
+                                horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: _getStatusColor(item['status'] ?? ''),
+                              color: _getStatusColor(item["status"]),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text(item['status'] ?? 'Unknown',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold)),
-                          )
+                            child: Text(
+                              item["status"],
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     );
@@ -175,9 +209,7 @@ class _StaffHistoryPageState extends State<StaffHistoryPage> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-                color: Colors.black12,
-                blurRadius: 12,
-                offset: Offset(0, -2))
+                color: Colors.black12, blurRadius: 12, offset: Offset(0, -2))
           ],
         ),
         child: BottomNavigationBar(
