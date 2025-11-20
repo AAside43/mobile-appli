@@ -27,15 +27,23 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Helper function to get local IP address
 function getLocalIPAddress() {
     const interfaces = os.networkInterfaces();
+    const addresses = [];
+    
     for (const name of Object.keys(interfaces)) {
         for (const iface of interfaces[name]) {
             // Skip internal (loopback) and non-IPv4 addresses
             if (iface.family === 'IPv4' && !iface.internal) {
-                return iface.address;
+                addresses.push(iface.address);
             }
         }
     }
-    return '0.0.0.0';
+    
+    // Prefer non-VPN addresses (typically 192.168.x.x or 10.x.x.x)
+    const preferred = addresses.find(addr => 
+        addr.startsWith('192.168.') || addr.startsWith('10.')
+    );
+    
+    return preferred || addresses[0] || '0.0.0.0';
 }
 
 // Get server IP endpoint (for auto-configuration)
@@ -709,6 +717,34 @@ app.delete('/booking/:id', (req, res) => {
 
 // --- ⬆️ END OF NEW/MODIFIED ENDPOINTS ⬆️ ---
 
+// Auto-update config.dart when IP changes
+let currentServerIP = getLocalIPAddress();
+
+function checkAndUpdateIP() {
+    const newIP = getLocalIPAddress();
+    if (newIP !== currentServerIP && newIP !== '0.0.0.0') {
+        console.log(`\n⚠️  Network change detected!`);
+        console.log(`   Old IP: ${currentServerIP}`);
+        console.log(`   New IP: ${newIP}`);
+        
+        currentServerIP = newIP;
+        
+        // Auto-update config.dart
+        const { exec } = require('child_process');
+        exec('node update-ip.js', (error, stdout, stderr) => {
+            if (error) {
+                console.error(`❌ Error updating config: ${error.message}`);
+                return;
+            }
+            console.log(`✅ Config.dart updated automatically!`);
+            console.log(`📱 New URL: http://${newIP}:${PORT}`);
+        });
+    }
+}
+
+// Check for IP changes every 15 seconds
+setInterval(checkAndUpdateIP, 15000);
+
 // Start server
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0'; // Listen on all network interfaces
@@ -721,4 +757,5 @@ app.listen(PORT, HOST, () => {
     console.log(`🌐 Android Emulator: http://10.0.2.2:${PORT}`);
     console.log(`📱 Use this URL in your Flutter app: http://${localIP}:${PORT}`);
     console.log(`🔍 Get server IP: http://${localIP}:${PORT}/server-ip`);
+    console.log(`\n🔍 Monitoring network changes (checking every 15s)...`);
 });
