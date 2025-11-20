@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'login_page.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'config.dart'; 
+import 'config.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({Key? key}) : super(key: key);
@@ -149,11 +149,11 @@ class _RegisterPageState extends State<RegisterPage> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
+                        boxShadow: const [
                           BoxShadow(
                             color: Colors.black12,
                             blurRadius: 8,
-                            offset: const Offset(0, 4),
+                            offset: Offset(0, 4),
                           ),
                         ],
                       ),
@@ -177,7 +177,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                 borderRadius: BorderRadius.circular(30),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black12.withOpacity(0.1),
+                                    color: Colors.black12
+                                        .withAlpha((0.1 * 255).round()),
                                     blurRadius: 6,
                                     offset: const Offset(0, 3),
                                   ),
@@ -218,7 +219,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                 borderRadius: BorderRadius.circular(30),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black12.withOpacity(0.1),
+                                    color: Colors.black12
+                                        .withAlpha((0.1 * 255).round()),
                                     blurRadius: 6,
                                     offset: const Offset(0, 3),
                                   ),
@@ -269,7 +271,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                 borderRadius: BorderRadius.circular(30),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black12.withOpacity(0.1),
+                                    color: Colors.black12
+                                        .withAlpha((0.1 * 255).round()),
                                     blurRadius: 6,
                                     offset: const Offset(0, 3),
                                   ),

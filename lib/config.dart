@@ -1,7 +1,7 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-const String _defaultHost = '172.25.65.64'; 
+const String _defaultHost = '172.25.236.59'; 
 const int _port = 3000;
 
 String get apiBaseUrl {

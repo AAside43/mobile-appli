@@ -145,7 +145,7 @@ class _StaffEditRoomPageState extends State<StaffEditRoomPage> {
                       fit: BoxFit.cover)),
               child: Container(
                 decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withAlpha((0.3 * 255).round()),
                     borderRadius: BorderRadius.circular(12)),
                 child: const Center(
                     child: Icon(Icons.edit, color: Colors.white, size: 40)),

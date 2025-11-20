@@ -14,7 +14,9 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Study Room Reservations System',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange),
+        visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       home: const LoginPage(), // หน้าแรกคือ LoginPage
     );

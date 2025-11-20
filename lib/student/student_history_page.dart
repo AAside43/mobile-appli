@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
@@ -9,6 +10,8 @@ import 'student_home_page.dart';
 import 'student_room_page.dart';
 import 'student_check_page.dart';
 import '../login_page.dart';
+import '../services/sse_service.dart';
+import '../widgets/skeleton.dart';
 
 class StudentHistoryPage extends StatefulWidget {
   const StudentHistoryPage({Key? key}) : super(key: key);
@@ -29,6 +32,32 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
   void initState() {
     super.initState();
     _loadBookingHistory();
+    _sseSub = sseService.events.listen((msg) {
+      final event = msg['event'];
+      if (event == 'booking_created' || event == 'booking_updated') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(event == 'booking_created'
+                  ? 'New booking created'
+                  : 'Booking updated'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          _loadBookingHistory();
+        }
+      } else if (event == 'room_changed') {
+        if (mounted) _loadBookingHistory();
+      }
+    });
+  }
+
+  StreamSubscription? _sseSub;
+
+  @override
+  void dispose() {
+    _sseSub?.cancel();
+    super.dispose();
   }
 
   // ฟังก์ชันสำหรับดึง Token มาสร้าง Headers
@@ -203,8 +232,49 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
       // BODY
       // =============================
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFFFA726)),
+          ? Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: List.generate(4, (i) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black12, blurRadius: 6)
+                      ],
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  SkeletonBox(height: 14, width: 24),
+                                  SizedBox(width: 8),
+                                  SkeletonBox(height: 14, width: 120),
+                                ],
+                              ),
+                              SizedBox(height: 8),
+                              SkeletonBox(height: 12, width: 80),
+                              SizedBox(height: 6),
+                              SkeletonBox(height: 12),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        SkeletonBox(height: 28, width: 60),
+                      ],
+                    ),
+                  );
+                }),
+              ),
             )
           : Padding(
               padding: const EdgeInsets.all(16),
@@ -233,7 +303,7 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.grey.shade200),
-                            boxShadow: [
+                            boxShadow: const [
                               BoxShadow(color: Colors.black12, blurRadius: 6),
                             ],
                           ),
@@ -324,13 +394,13 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
       // BOTTOM NAV
       // =============================
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
                 color: Colors.black26,
                 blurRadius: 8,
-                offset: const Offset(0, -2)),
+                offset: Offset(0, -2)),
           ],
         ),
         child: BottomNavigationBar(
@@ -339,11 +409,11 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
           unselectedItemColor: Colors.black54,
           onTap: (index) {
             if (index == 0) {
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (_) => const StudentHomePage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const StudentHomePage()));
             } else if (index == 1) {
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (_) => const StudentRoomPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (_) => const StudentRoomPage()));
             } else if (index == 2) {
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (_) => const StudentCheckPage()));
