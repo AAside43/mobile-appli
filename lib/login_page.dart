@@ -26,7 +26,42 @@ class _LoginPageState extends State<LoginPage> {
 
   // 2. เพิ่มตัวแปรสำหรับ API
   bool _isLoading = false;
-  final String baseUrl = apiBaseUrl; // centralized in lib/config.dart
+  bool _isConnecting = true;
+  String _connectionStatus = 'Connecting to server...';
+  String baseUrl = apiBaseUrl; // centralized in lib/config.dart
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeConnection();
+  }
+
+  Future<void> _initializeConnection() async {
+    setState(() {
+      _isConnecting = true;
+      _connectionStatus = 'Searching for server...';
+    });
+
+    try {
+      final serverIp = await getServerIp();
+      if (mounted) {
+        setState(() {
+          baseUrl = 'http://$serverIp:3000';
+          _connectionStatus = 'Connected to $serverIp';
+          _isConnecting = false;
+        });
+        print('✅ Server found at: $baseUrl');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _connectionStatus = 'Connection failed. Using default.';
+          _isConnecting = false;
+        });
+        print('❌ Connection error: $e');
+      }
+    }
+  }
 
   void _togglePasswordVisibility() {
     setState(() {
@@ -50,6 +85,9 @@ class _LoginPageState extends State<LoginPage> {
       _isLoading = true;
     });
 
+    print('🔐 Attempting login to: $baseUrl/login');
+    print('📝 Username: ${_studentIdController.text}');
+
     try {
       final response = await http
           .post(
@@ -67,9 +105,12 @@ class _LoginPageState extends State<LoginPage> {
         },
       );
 
+      print('📡 Response status: ${response.statusCode}');
+      
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print("Login Response: $data");
+        print("✅ Login Response: $data");
+        print("👤 Role: ${data['role']}");
 
         final prefs = await SharedPreferences.getInstance();
 
@@ -114,13 +155,24 @@ class _LoginPageState extends State<LoginPage> {
             MaterialPageRoute(builder: (_) => const StaffDashboardPage()),
           );
         } else {
+          print('⚠️ Unknown role, redirecting to login');
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const LoginPage()),
           );
         }
+      } else {
+        print('❌ Login failed with status: ${response.statusCode}');
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Login failed: ${response.body}"),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
     } catch (e) {
+      print('❌ Login error: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -178,7 +230,65 @@ class _LoginPageState extends State<LoginPage> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
+
+                // ===== CONNECTION STATUS =====
+                if (_isConnecting)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          _connectionStatus,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.blue.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green.shade700, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          _connectionStatus,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 20),
 
                 // ( ... โค้ดส่วน User ID และ Password เหมือนเดิม ...)
                 // ===== USER ID =====
@@ -244,7 +354,7 @@ class _LoginPageState extends State<LoginPage> {
                 SizedBox(
                   width: 180,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _login, // 6. ปิดปุ่มขณะโหลด
+                    onPressed: (_isLoading || _isConnecting) ? null : _login, // Disable while connecting or loading
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFA726),
                       padding: const EdgeInsets.symmetric(vertical: 12),

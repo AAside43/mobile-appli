@@ -104,7 +104,7 @@ app.get('/events', (req, res) => {
 
     // send a comment to keep the connection alive initially
     res.write(': connected\n\n');
-
++
     sseClients.add(res);
 
     req.on('close', () => {
